@@ -1,21 +1,22 @@
-# Art of Peace — survival prototype
+# Art of Peace — rescue prototype
 
 Open `project.godot` in Godot 4.6 and press **F5**.
 
 - Start paused with an empty forest and **five peaceful people in the middle**.
 - Hover over golden seeds to collect; left-click empty tiles to plant trees for one seed. Right-click removes a tree without refunding seeds.
-- **Space** starts/pauses, **R** restarts, and **F** switches between normal and double speed. You can collect and reshape the forest while paused.
-- Reach **10 living peaceful people** to advance to level 2, then 20 for level 3, then 30, and so on. Levels advance automatically, preserving people, trees, seeds, and wave progress. Lifetime conversions do not count as living survivors.
-- **Zero living peaceful people, or a destroyed village, means game over.** The old peace meter and fixed soldier limit are removed.
-- Armies spawn endlessly in waves of 10 pairs. The first spawn waits five seconds; gaps shorten within each wave and across later waves, down to 0.65 seconds. Each wave has an eight-second break before the next wave's initial delay.
+- **Space** starts/pauses, **R** restarts, and **F** or the speed button cycles Normal (1x), Fast (2x), and Ultra (4x). You can collect and reshape the forest while paused.
+- **Rescue 10 people to the village before either camp falls.** Arrivals count once, including the five starting peaceful people. Conversion alone does not count; later deaths do not subtract completed rescues.
+- Success freezes the round and shows **Peace restored!** Press **Next level** to start a fresh map with a goal of 20, then 30, with later goals capped at 30. Each level begins paused with the authored five people, seeds, and empty forest. Later levels start with a gentle opening wave.
+- **Either camp falling or zero peaceful survivors means failure.** Try again / R retries the current level. Space continues from the result screen.
+- Soldiers always head for the opposing camp. Plant trees to redirect their shortest route through their matching gate. Start with **8 seeds**, steady **10-second spawn gaps**, and no anomalies in levels 1–2.
+- Armies spawn endlessly in waves of 10 pairs, with a 10-second rest. Gaps stay constant within a wave and shorten by 1 second each new wave, down to 0.65 seconds. **Anomalies start at level 3**, then every 20th spawn. 
+- People move at the original **48 pixels/second**; only spawn gaps accelerate between waves. Gates mirror each other across the map; the village stays centered and changes only its height between levels; retry keeps the same layout. Generated layouts avoid starting seeds, people, trees, and camp entrances.
 - Hostile armies primarily move toward the opposing camp; they do not chase peaceful people. On contact, a peaceful person dies and the attacker survives, including an attacker from their original team. Opposing hostile soldiers still fight each other; peaceful people never attack.
-- Camps start with **20 HP**. A hostile soldier reaching an opposing camp's entry tile deals **1 damage each second**. The first camp to reach zero is defeated, and the other army wins the war.
-- After victory, the defeated army's remaining hostile soldiers withdraw without adding deaths. Its peaceful people remain. Only the winning army continues spawning, one soldier per spawn pulse, and its normal soldiers/anomalies redirect toward the village. Existing wave timing continues.
-- The village starts with **30 HP**. Winning soldiers that reach its center attack it; village destruction ends the game even if some peaceful people remain. Gates still convert normal soldiers, and anomalies still avoid both gates, so you can continue redirecting the invasion.
+- Camps start with **20 HP**. A hostile soldier at the opposing camp deals **1 damage each second**. Keep both camps standing until your rescue goal is reached. The round ends when a camp falls.
 - Normal soldiers avoid trees and use shortest four-direction routes. A soldier with no available route cuts a blocking tree over two seconds.
-- Passing through a soldier's matching peace gate turns them white and peaceful. They first travel to the **Peace Village at the top middle** and then stay around it.
-- Peaceful villagers collect nearby seeds, carry one seed at a time, and return to the village. Your stock increases **on delivery**, not pickup. A killed carrier loses the undelivered seed. You can still collect seeds yourself by hovering.
-- Every 20th spawned soldier is an **anomaly**, alternating camps. Orange rings and markers identify them. Their random detours lead toward the opposing camp. They ignore trees and destroy them on contact, but route around **both peace gates**. If forced onto a matching gate tile, the gate still converts them.
+- Passing through a soldier's matching peace gate turns them white and peaceful. They first travel to the **Peace Village at its authored scene position** and then stay around it.
+- Peaceful villagers collect reachable seeds anywhere on the map, carry one seed at a time, and return to the village. Your stock increases **on delivery**, not pickup. A killed carrier loses the undelivered seed. You can still collect seeds yourself by hovering.
+- From level 3, every 20th spawned soldier is an **anomaly**, alternating camps. Orange rings and markers identify them. Their random detours lead toward the opposing camp. They ignore trees and destroy them on contact, but route around **both peace gates**. If forced onto a matching gate tile, the gate still converts them.
 
 The game now uses separate editable Godot scenes, scripts, and transparent PNG placeholder sprites. The existing Godot MCP addon is preserved.
 
@@ -27,7 +28,7 @@ Read [the editor guide](docs/EDITOR_GUIDE.md) for the scene tree, artwork replac
 - **Gameplay values:** edit `resources/default_settings.tres` in the Inspector.
 - **Objects:** open the separate scenes in `scenes/entities/`. Blue/red soldiers, peaceful people, and anomalies are inherited variants of `person.tscn`.
 - **Village:** move `Board/Village` in the main scene. Its Inspector exposes wander and forage radii; its separate `village.tscn` scene uses replaceable PNG art.
-- **Camp/village health:** select their scene roots and edit Max Health. Attack interval and damage are in the shared settings resource under Camp and Village Attacks.
+- **Camp health:** select their scene roots and edit Max Health. Attack interval and damage are in the shared settings resource under Camp Attacks.
 - **Sprites:** replace the PNG images in `assets/sprites/`, or assign new textures in the entity scenes. Matching SVGs are the original shape sources.
 - **UI:** edit `scenes/ui/hud.tscn` and `resources/ui_theme.tres`.
 - **Checks:** open `tests/run_checks.tscn` and press **F6**. The regression suite checks the real scenes and gameplay rules; **F5** runs the game again.

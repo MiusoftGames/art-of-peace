@@ -11,6 +11,8 @@ extends Node2D
 var health := 30
 
 func _ready() -> void:
+	$HealthBar.hide()
+	$HealthLabel.hide()
 	health = max_health
 	refresh_health()
 

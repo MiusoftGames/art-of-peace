@@ -3,33 +3,43 @@ extends CanvasLayer
 
 signal march_pressed
 signal restart_pressed
+signal next_level_pressed
+signal speed_pressed
 
 func _ready() -> void:
+	$Root/TopBar/SpeedButton.pressed.connect(func() -> void: speed_pressed.emit())
 	$Root/TopBar/MarchButton.pressed.connect(func() -> void: march_pressed.emit())
 	$Root/TopBar/RestartButton.pressed.connect(func() -> void: restart_pressed.emit())
 
+	$Root/GameOver/ContinueButton.pressed.connect(func() -> void: next_level_pressed.emit())
+	$Root/GameOver/RetryButton.pressed.connect(func() -> void: restart_pressed.emit())
+
 func update_status(game: Node) -> void:
 	var living: int = game.peaceful_count()
+	$Root/TopBar/SpeedButton.text = "Normal 1x" if game.speed == 1.0 else ("Fast 2x" if game.speed == 2.0 else "Ultra 4x")
 	$Root/TopBar/Seeds.text = "SEEDS  %d" % game.stock
-	$Root/TopBar/Alive.text = "ALIVE  %d / %d" % [living, game.goal]
+	$Root/TopBar/Alive.text = "RESCUED %d / %d" % [game.rescued, game.goal]
 	$Root/TopBar/Progress.max_value = game.goal
-	$Root/TopBar/Progress.value = living
+	$Root/TopBar/Progress.value = game.rescued
 	$Root/TopBar/Level.text = "LEVEL %d" % game.level
 	$Root/TopBar/Wave.text = "WAVE %d" % game.waves.wave
-	$Root/TopBar/MarchButton.text = "Try again" if game.lost else ("Pause" if game.running else "Begin march")
+	$Root/TopBar/MarchButton.text = "Next level" if game.won else ("Try again" if game.lost else ("Pause" if game.running else "Begin march"))
 	$Root/Population/Count.text = str(living)
 	$Root/Population/Converted.text = "Converted: %d" % game.converted
 	$Root/Population/Deaths.text = "Lost: %d" % game.deaths
-	$Root/Population/Goal.text = "Goal: %d alive" % game.goal
+	$Root/Population/Goal.text = "Rescue: %d" % game.goal
 	$Root/Population/Spawned.text = "Spawned: %d" % game.spawned
 	$Root/Delivered.text = "Delivered: %d" % game.delivered
 	$Root/WaveStatus/Wave.text = "Wave %d" % game.waves.wave
-	$Root/WaveStatus/Phase.text = "War: camps" if game.battle_winner == -1 else ("Blue: village" if game.battle_winner == 0 else "Red: village")
+	$Root/WaveStatus/Phase.text = "Protect camps"
 	$Root/WaveStatus/Countdown.text = "Rest: %.0fs" % ceilf(game.waves.rest_remaining) if game.waves.rest_remaining > 0 else "Next: %.0fs" % ceilf(game.waves.spawn_remaining)
 	$Root/Controls/TreeCost.text = "%d seed / tree" % game.settings.tree_cost
 	$Root/Controls/Speed.text = "F: speed %dx" % int(game.speed)
-	$Root/Anomaly/Description.text = "Every %dth\nspawn breaks\nthrough trees." % game.settings.anomaly_every
+	$Root/Anomaly/Description.text = "Starts level %d\nEvery %dth spawn" % [game.settings.anomaly_start_level, game.settings.anomaly_every]
 	$Root/Message.text = game.message
-	$Root/GameOver.visible = game.lost
-	$Root/GameOver/Title.text = "VILLAGE DESTROYED" if game.village.health <= 0 else "NO PEACEFUL SURVIVORS"
-	$Root/GameOver/Details.text = "Level %d  /  wave %d  /  %d converted" % [game.level, game.waves.wave, game.converted]
+	$Root/GameOver.visible = game.lost or game.won
+	$Root/GameOver/Title.text = "PEACE RESTORED!" if game.won else "RESCUE FAILED"
+	$Root/GameOver/Details.text = "%d people reached the village.\nNext level: rescue %d people." % [game.rescued, mini(game.settings.maximum_rescue_goal, game.goal + game.settings.goal_increment)] if game.won else game.failure_reason
+	$Root/GameOver/Hint.text = "Level %d  /  %d rescued  /  %d lost" % [game.level, game.rescued, game.deaths]
+	$Root/GameOver/ContinueButton.visible = game.won
+	$Root/GameOver/RetryButton.visible = game.lost

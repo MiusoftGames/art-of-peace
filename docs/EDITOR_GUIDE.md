@@ -27,7 +27,7 @@ ArtOfPeace
 ```
 
 - Move gates, starting people, and starting seeds with the 2D editor's Move tool. Their grid cells are read from the scene positions at runtime. The board's top-left is its local origin; default cell centers are **20 + 40 × column**, **20 + 40 × row**.
-- Move **Board/Village** to change where peaceful people settle and deliver seeds. Select its root to tune **Wander Radius** (2 tiles by default) and **Forage Radius** (4 tiles). The village delivery tile is protected from tree planting. Villagers reserve separate nearby seeds, show a carried seed, and credit your stock only when they return; death loses the carried seed.
+- Move **Board/Village** to change where peaceful people settle and deliver seeds. Select its root to tune **Wander Radius** (2 tiles by default) and **Forage Radius** (4 tiles). The village delivery tile is protected from tree planting. Villagers reserve separate reachable seeds anywhere on the map, show a carried seed, and credit your stock only when they return; death loses the carried seed.
 - Move a camp's **SpawnPoint** marker to change its entry tile. Changing the camp's position also moves its marker; keep both entry markers within the forest.
 - Camps have **Max Health** (20 by default), and the village has **Max Health** (30). Select the corresponding scene root to edit it; save and restart to apply the new starting health. Health bars and HP labels are real editable scene controls.
 - Duplicate/delete instances under **Board/People** to edit the starting population. The `peaceful_person.tscn` variant is already configured as peaceful.
@@ -42,11 +42,12 @@ Select the **ArtOfPeace** root and expand **Settings**, or open **resources/defa
 | Inspector group | What you can change |
 | --- | --- |
 | Forest Grid | Grid dimensions and tile size |
-| Survival Goals | First goal and increase per level |
-| Waves | Pairs per wave, initial/minimum gap, acceleration, rest duration, anomaly frequency |
+| Rescue Goals | First goal, increase per level, maximum rescue goal (30) |
+| Level Layout | Vary Level Layout: enable/disable generated positions for each level |
+| Waves | Pairs per wave, initial/minimum gap, reduction per wave, rest duration, anomaly start level/frequency |
 | People | Movement speed, speed increase per level, contact distance, wandering pauses |
-| Camp and Village Attacks | Time between building attacks and damage per hit |
-| Trees and Seeds | Tree cost, cutting time, seed spawn interval, maximum seeds |
+| Camp Attacks | Time between building attacks and damage per hit |
+| Trees and Seeds | Starting seeds, tree cost, cutting time, seed spawn interval, maximum seeds |
 | Anomaly Routes | Detour chance/size and route segment lengths |
 
 The settings resource is shared by the board and game. Save resource edits and restart the game to apply them. Grid size/tile size update the editor's ground preview; reposition gates, seeds, people, and entry markers when changing the grid. The HUD is laid out for the default 1080 × 760 viewport; adjust it if you resize the map.
@@ -75,7 +76,7 @@ Open **scenes/ui/hud.tscn** to move labels/buttons, edit help text, and change l
 
 | Code file | Responsibility |
 | --- | --- |
-| `scripts/game.gd` | Session state, input, resource collection, level goals, army victory, siege targets, instantiation |
+| `scripts/game.gd` | Session state, input, resource collection, level goals, rescue arrivals, round results and fresh level transitions, instantiation |
 | `scripts/entities/person.gd` | Camp-bound soldiers, village visits/seed delivery, gate-avoiding anomaly routes, cutting, conversion |
 | `scripts/entities/village.gd` | Village destination, wandering and foraging radii |
 | `scripts/systems/pathfinding.gd` | Grid breadth-first search |
@@ -88,6 +89,12 @@ Open **scenes/ui/hud.tscn** to move labels/buttons, edit help text, and change l
 
 Open **tests/run_checks.tscn** and press **F6** to run the gameplay regression checks. These use fresh main-scene instances, including the real entity scenes, and leave the saved level unchanged. Press **F5** to return to the game.
 
-## Camp battle and village invasion
+## Rescue rounds
 
-Before an army wins, hostile people head for the opposing camp's entry marker. On reaching it, they attack at the configured interval. The first defeated camp ends the war: hostile members of the losing army withdraw, its peaceful members stay, and only the winner continues spawning. Both normal and anomaly winners now head toward the village; anomaly routes still avoid gate tiles. The village's health reaching zero ends the game, alongside the existing zero-survivor loss condition. The survival goals and resource loop continue through both phases.
+People count once on first reaching the village center, including authored starting peaceful people. Converting at a gate alone does not count. Completed arrivals remain credited if that person later dies. Rescue the goal number before either camp falls; zero peaceful survivors also fails the round. The result screen freezes play and offers Next level or Try again. Generated layouts keep the village on the center column and vary its height; both gates mirror each other across the map on the same row, with a repeatable layout for each level. Disable Vary Level Layout to keep editor placements throughout. Each round clears runtime trees, resources, counters, and waves. Goals rise by Goal Increment up to Maximum Rescue Goal (30); the counter also caps at the current goal. Each round opens with steady slow gaps; Gap Reduction Per Wave applies only between waves. Anomaly Start Level defaults to 3. Starting Seeds defaults to 8. Restart retries the current level.
+
+Both camps keep spawning until the round ends. Soldiers attack the opposing camp at the configured interval; there is no village invasion phase. Village health is unused and its runtime health display is hidden. The village placement in the editor remains the destination, so moving it changes rescue and seed delivery routes.
+
+Layout placement lives in `scripts/world/level_layout.gd`. It avoids authored seeds, people, trees and camp entries; gates stay away from the direct camp-entry row. Opening spawns wait 10 seconds, reducing by 1 second per wave. Movement stays at the original 48 pixels/second by default; wave difficulty changes only spawn gaps.
+
+The top speed button and F key cycle Normal 1x, Fast 2x, and Ultra 4x. Villagers can travel across the board for reachable seeds, then return to deliver them. Forage Radius is retained for compatibility but no longer limits collection.

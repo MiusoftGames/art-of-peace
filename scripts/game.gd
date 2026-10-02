@@ -16,7 +16,7 @@ extends Node2D
 @onready var waves: WaveSpawner = $Systems/Waves
 @onready var seed_spawner: Node = $Systems/SeedSpawner
 @onready var combat: Node = $Systems/Combat
-@onready var hud: PeaceHUD = $HUD
+@onready var hud = $HUD
 
 var trees: Dictionary = {}
 var seeds: Dictionary = {}
@@ -37,16 +37,25 @@ var hover := Vector2i(-1, -1)
 var rng := RandomNumberGenerator.new()
 var anomaly_count := 0
 var battle_winner := -1
+var won := false
+var rescued := 0
+var failure_reason := ""
 
 func _ready() -> void:
 	rng.randomize()
 	board.settings = settings
-	goal = settings.first_goal
+	stock = settings.starting_seeds
+	preload("res://scripts/world/level_layout.gd").apply(self)
+	goal = mini(settings.maximum_rescue_goal, settings.first_goal + (level - 1) * settings.goal_increment)
 	waves.configure(settings)
+	waves.level_offset = 0
+	waves.spawn_remaining = waves.interval()
 	waves.spawn_pair_requested.connect(spawn_pair)
 	waves.message_requested.connect(notify_player)
 	hud.march_pressed.connect(toggle_march)
 	hud.restart_pressed.connect(reset_game)
+	hud.next_level_pressed.connect(next_level)
+	hud.speed_pressed.connect(cycle_speed)
 	# Objects placed in main.tscn are the actual initial game state.
 	for person in $Board/People.get_children():
 		if person is PeacePerson:
@@ -59,12 +68,38 @@ func _ready() -> void:
 		if seed_node is PeaceSeed:
 			seed_node.cell = board.cell_at(seed_node.position)
 			seeds[seed_node.cell] = seed_node
-	notify_player("Protect the %d peaceful people. Grow their living population to %d." % [peaceful_count(), goal])
+	notify_player("Rescue %d people: guide soldiers through their gate and into the village before a camp falls." % goal)
 	hud.update_status(self)
 
 func reset_game() -> void:
-	# Reloading preserves every change made to the authored scenes.
-	get_tree().call_deferred("reload_current_scene")
+	call_deferred("load_round", level)
+
+func next_level() -> void:
+	if won:
+		call_deferred("load_round", level + 1)
+
+func load_round(number: int) -> void:
+	var fresh = load("res://main.tscn").instantiate()
+	fresh.level = number
+	fresh.settings = settings
+	var tree := get_tree()
+	tree.root.add_child(fresh)
+	tree.current_scene = fresh
+	queue_free()
+
+func record_arrival(person: PeacePerson) -> void:
+	if person.peaceful and not person.dead and not person.reached_village:
+		person.reached_village = true
+		rescued = mini(goal, rescued + 1)
+
+func finish_round(success: bool, reason := "") -> void:
+	if won or lost:
+		return
+	won = success
+	lost = not success
+	running = false
+	failure_reason = reason
+	notify_player("Peace restored! %d people reached the village." % rescued if won else reason)
 
 func register_person(person: PeacePerson) -> void:
 	person.cell = board.cell_at(person.position)
@@ -96,33 +131,19 @@ func get_camp(team: int) -> ArmyCamp:
 	return null
 
 func hostile_destination(team: int) -> Vector2i:
-	return village.home_cell(board) if battle_winner == team else spawn_cell(1 - team)
+	return spawn_cell(1 - team)
 
 func attack_destination(person: PeacePerson) -> void:
-	if person.peaceful or person.dead or person.retreated:
+	if won or lost or person.peaceful or person.dead or person.retreated:
 		return
-	if battle_winner == person.team:
-		if person.cell == village.home_cell(board):
-			village.take_damage(settings.building_attack_damage)
-	elif battle_winner == -1 and person.cell == spawn_cell(1 - person.team):
+	if person.cell == spawn_cell(1 - person.team):
 		var camp := get_camp(1 - person.team)
 		if camp != null and camp.take_damage(settings.building_attack_damage):
 			declare_army_winner(person.team)
 
 func declare_army_winner(team: int) -> void:
-	if battle_winner != -1:
-		return
 	battle_winner = team
-	for person in soldiers:
-		if person.peaceful:
-			continue
-		if person.team != team:
-			person.retreated = true
-		else:
-			person.route_steps = 0
-			person.waypoint = village.home_cell(board)
-			person.attack_elapsed = 0.0
-	notify_player("%s army won the war! It is now marching on the village." % ("Blue" if team == 0 else "Red"))
+	finish_round(false, "A camp fell before the rescue was complete.")
 
 func is_matching_gate(cell: Vector2i, team: int) -> bool:
 	for gate in $Board/Gates.get_children():
@@ -146,8 +167,14 @@ func peaceful_count() -> int:
 func notify_player(text: String) -> void:
 	message = text
 
+func cycle_speed() -> void:
+	speed = 2.0 if speed == 1.0 else (4.0 if speed == 2.0 else 1.0)
+	hud.update_status(self)
+
 func toggle_march() -> void:
-	if lost:
+	if won:
+		next_level()
+	elif lost:
 		reset_game()
 	else:
 		running = not running
@@ -155,7 +182,7 @@ func toggle_march() -> void:
 	hud.update_status(self)
 
 func collect_at(local_position: Vector2) -> void:
-	if lost:
+	if lost or won:
 		return
 	for cell in seeds.keys():
 		var seed_node: PeaceSeed = seeds[cell]
@@ -181,8 +208,6 @@ func release_seed_claim(person: PeacePerson) -> void:
 func find_seed_path(person: PeacePerson) -> Array[Vector2i]:
 	var targets: Dictionary = {}
 	for cell in seeds:
-		if not village.within_forage_area(cell, board):
-			continue
 		var claimant = seed_claims.get(cell)
 		if is_instance_valid(claimant) and not claimant.dead and claimant != person:
 			continue
@@ -201,7 +226,7 @@ func deliver_seeds(person: PeacePerson) -> void:
 	emit_effect(village.position, Color("ffd47b"))
 
 func plant(cell: Vector2i) -> bool:
-	if lost or not board.inside(cell) or protected(cell) or trees.has(cell):
+	if lost or won or not board.inside(cell) or protected(cell) or trees.has(cell):
 		return false
 	if stock < settings.tree_cost:
 		notify_player("Find a golden seed first: hover over it to collect.")
@@ -228,7 +253,7 @@ func destroy_tree(cell: Vector2i) -> bool:
 	return true
 
 func remove_tree(cell: Vector2i) -> bool:
-	return false if lost else destroy_tree(cell)
+	return false if lost or won else destroy_tree(cell)
 
 func emit_effect(local_position: Vector2, color: Color) -> void:
 	var effect := effect_scene.instantiate() as Node2D
@@ -251,16 +276,17 @@ func spawn_pair() -> void:
 	# If this pair contains an anomaly, choose its team alternately.
 	var teams := [0, 1]
 	var frequency := maxi(1, settings.anomaly_every)
-	var first_is_anomaly := (spawned + 1) % frequency == 0
-	var second_is_anomaly := (spawned + 2) % frequency == 0
+	var anomalies_enabled := level >= settings.anomaly_start_level
+	var first_is_anomaly := anomalies_enabled and (spawned + 1) % frequency == 0
+	var second_is_anomaly := anomalies_enabled and (spawned + 2) % frequency == 0
 	var preferred_team := 1 if anomaly_count % 2 == 0 else 0
 	if (first_is_anomaly and preferred_team == 1) or (not first_is_anomaly and second_is_anomaly and preferred_team == 0):
 		teams = [1, 0]
-	if battle_winner != -1:
-		teams = [battle_winner]
+	if lost or won:
+		return
 	for team in teams:
 		spawned += 1
-		var anomaly := spawned % frequency == 0
+		var anomaly := anomalies_enabled and spawned % frequency == 0
 		make_person(team, spawn_cell(team), false, anomaly)
 		if anomaly:
 			anomaly_count += 1
@@ -299,27 +325,28 @@ func _unhandled_input(event: InputEvent) -> void:
 		match event.keycode:
 			KEY_SPACE: toggle_march()
 			KEY_R: reset_game()
-			KEY_F: speed = 2.0 if speed == 1.0 else 1.0
+			KEY_F: cycle_speed()
 
 func advance(delta: float) -> void:
+	if won or lost:
+		return
 	waves.advance(delta)
 	for person in soldiers:
 		person.step(delta, self)
+		if lost:
+			break
+	if lost:
+		return
 	combat.resolve(self)
-	var living := peaceful_count()
-	if living == 0 or village.health <= 0:
-		lost = true
-		running = false
-		notify_player("The village was destroyed. Restart to try again." if village.health <= 0 else "No peaceful people survived. Restart to try again.")
-	elif living >= goal:
-		level += 1
-		goal = settings.first_goal + (level - 1) * settings.goal_increment
-		notify_player("Level %d! Protect and grow the peaceful population to %d." % [level, goal])
+	if peaceful_count() == 0:
+		finish_round(false, "No peaceful people survived.")
+	elif rescued >= goal:
+		finish_round(true)
 
 func _process(delta: float) -> void:
-	if not lost:
+	if not lost and not won:
 		seed_spawner.advance(delta, self)
 	if running:
 		advance(delta * speed)
-	board.show_preview(hover, not protected(hover) and not trees.has(hover) and stock >= settings.tree_cost, not lost)
+	board.show_preview(hover, not protected(hover) and not trees.has(hover) and stock >= settings.tree_cost, not lost and not won)
 	hud.update_status(self)

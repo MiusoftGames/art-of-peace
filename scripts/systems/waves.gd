@@ -5,6 +5,7 @@ signal spawn_pair_requested
 signal message_requested(text: String)
 
 var settings: PeaceSettings
+var level_offset := 0
 var wave := 1
 var pairs_sent := 0
 var rest_remaining := 0.0
@@ -18,7 +19,7 @@ func configure(tuning: PeaceSettings) -> void:
 	spawn_remaining = interval()
 
 func interval() -> float:
-	return maxf(settings.minimum_spawn_gap, settings.initial_spawn_gap - (wave - 1) * settings.gap_reduction_per_wave - pairs_sent * settings.gap_reduction_per_pair)
+	return maxf(settings.minimum_spawn_gap, settings.initial_spawn_gap - (wave - 1 + level_offset) * settings.gap_reduction_per_wave)
 
 func advance(delta: float) -> void:
 	if rest_remaining > 0.0:

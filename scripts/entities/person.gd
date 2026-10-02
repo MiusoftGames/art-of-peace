@@ -67,7 +67,7 @@ func step(delta: float, game: Node) -> void:
 		return
 	var destination: Vector2 = game.board.point(next_cell)
 	if position.distance_to(destination) > 0.1:
-		var movement_speed: float = (game.settings.movement_speed + game.level * game.settings.speed_gain_per_level) * speed_multiplier
+		var movement_speed: float = (game.settings.movement_speed + (game.level - 1) * game.settings.speed_gain_per_level) * speed_multiplier
 		position = position.move_toward(destination, movement_speed * delta)
 		if anomaly and not peaceful and game.trees.has(next_cell) and position.distance_to(destination) <= game.settings.cell_size * 0.5:
 			game.destroy_tree(next_cell)
@@ -88,7 +88,7 @@ func step(delta: float, game: Node) -> void:
 		while attack_elapsed >= interval:
 			attack_elapsed -= interval
 			game.attack_destination(self)
-			if game.hostile_destination(team) != cell or game.village.health <= 0:
+			if game.lost or game.won:
 				attack_elapsed = 0.0
 				break
 		return
@@ -126,7 +126,7 @@ func visit_village(delta: float, game: Node) -> void:
 		if cell != home:
 			follow_path(game.find_path(cell, home))
 			return
-		reached_village = true
+		game.record_arrival(self)
 	# The player or another villager may have collected our reserved seed.
 	if seed_target != Vector2i(-1, -1):
 		if not game.seeds.has(seed_target):
@@ -148,7 +148,7 @@ func visit_village(delta: float, game: Node) -> void:
 	wait_remaining -= delta
 	if wait_remaining > 0.0:
 		return
-	if game.seeds.has(cell) and game.village.within_forage_area(cell, game.board):
+	if game.seeds.has(cell):
 		if game.take_seed(cell):
 			carried_seeds = 1
 			return
