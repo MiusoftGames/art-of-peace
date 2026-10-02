@@ -1,0 +1,32 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scripts/world/board.gd" id="1"]
+[ext_resource type="Resource" path="res://resources/default_settings.tres" id="2"]
+[ext_resource type="Texture2D" path="res://assets/sprites/placement.png" id="3"]
+
+[node name="Forest" type="Node2D"]
+script = ExtResource("1")
+settings = ExtResource("2")
+
+[node name="Ground" type="ColorRect" parent="."]
+z_index = -1
+offset_right = 760.0
+offset_bottom = 600.0
+mouse_filter = 2
+color = Color(0.027451, 0.619608, 0.580392, 1)
+
+[node name="Gates" type="Node2D" parent="."]
+
+[node name="Trees" type="Node2D" parent="."]
+
+[node name="Seeds" type="Node2D" parent="."]
+
+[node name="People" type="Node2D" parent="."]
+
+[node name="Effects" type="Node2D" parent="."]
+
+[node name="PlacementPreview" type="Sprite2D" parent="."]
+visible = false
+z_index = 5
+texture = ExtResource("3")
+
