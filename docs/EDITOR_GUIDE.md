@@ -15,7 +15,7 @@ ArtOfPeace
 	Gates                    drag BlueGate / RedGate to new tiles
 	Trees                    empty by default; runtime trees live here
 	Seeds                    eight editable starting seed instances
-	People                   five editable starting peaceful people
+	People                   three editable starting peaceful people
 	Effects                  temporary ripple instances
 	PlacementPreview         image cursor
   Camps
@@ -42,11 +42,12 @@ Select the **ArtOfPeace** root and expand **Settings**, or open **resources/defa
 | Inspector group | What you can change |
 | --- | --- |
 | Forest Grid | Grid dimensions and tile size |
-| Rescue Goals | First goal, increase per level, maximum rescue goal (30) |
+| Rescue Goals | First goal, increase per level, maximum rescue goal (15) |
+| Later Level Variety | Random goal threshold/minimum, grouped spawn threshold/size, extra camp threshold/chance |
 | Level Layout | Vary Level Layout: enable/disable generated positions for each level |
-| Waves | Pairs per wave, initial/minimum gap, reduction per wave, rest duration, anomaly start level/frequency |
+| Waves | Pairs per wave, initial/minimum gap, reduction per wave, rest duration, anomaly start level, minimum/maximum random anomaly intervals |
 | People | Movement speed, speed increase per level, contact distance, wandering pauses |
-| Camp Attacks | Time between building attacks and damage per hit |
+| Camp Attacks | Delay before the single camp hit (each attacker deals exactly 1 damage, then dies) |
 | Trees and Seeds | Starting seeds, tree cost, cutting time, seed spawn interval, maximum seeds |
 | Anomaly Routes | Detour chance/size and route segment lengths |
 
@@ -91,10 +92,16 @@ Open **tests/run_checks.tscn** and press **F6** to run the gameplay regression c
 
 ## Rescue rounds
 
-People count once on first reaching the village center, including authored starting peaceful people. Converting at a gate alone does not count. Completed arrivals remain credited if that person later dies. Rescue the goal number before either camp falls; zero peaceful survivors also fails the round. The result screen freezes play and offers Next level or Try again. Generated layouts keep the village on the center column and vary its height; both gates mirror each other across the map on the same row, with a repeatable layout for each level. Disable Vary Level Layout to keep editor placements throughout. Each round clears runtime trees, resources, counters, and waves. Goals rise by Goal Increment up to Maximum Rescue Goal (30); the counter also caps at the current goal. Each round opens with steady slow gaps; Gap Reduction Per Wave applies only between waves. Anomaly Start Level defaults to 3. Starting Seeds defaults to 8. Restart retries the current level.
+People count once on first reaching the village center, including authored starting peaceful people. Converting at a gate alone does not count. Completed arrivals remain credited if that person later dies. Rescue the goal number before either camp falls; zero peaceful survivors also fails the round. The result screen freezes play and offers Next level or Try again. Generated layouts keep the village on the center column and vary its height; both gates mirror from opposite corners (blue upper left, red lower right), with randomized heights on every restart. Disable Vary Level Layout to keep editor placements throughout. Each round clears runtime trees, resources, counters, and waves. Goals rise by Goal Increment through level 8, then randomly choose 6–15 each round; the counter also caps at the current goal. Each round opens with steady slow gaps; Gap Reduction Per Wave applies only between waves. Anomaly Start Level defaults to 5. Starting Seeds defaults to 8. Restart retries the current level.
 
 Both camps keep spawning until the round ends. Soldiers attack the opposing camp at the configured interval; there is no village invasion phase. Village health is unused and its runtime health display is hidden. The village placement in the editor remains the destination, so moving it changes rescue and seed delivery routes.
 
-Layout placement lives in `scripts/world/level_layout.gd`. It avoids authored seeds, people, trees and camp entries; gates stay away from the direct camp-entry row. Opening spawns wait 10 seconds, reducing by 1 second per wave. Movement stays at the original 48 pixels/second by default; wave difficulty changes only spawn gaps.
+Layout placement lives in `scripts/world/level_layout.gd`. It avoids authored seeds, people, trees and camp entries; gates stay away from the direct camp-entry row. Column offset starts at 2 and increases by one per level, capped two columns from the center. Restart excludes the previous village and gate heights. Opening spawns wait 10 seconds, reducing by 1 second per wave. Movement stays at the original 48 pixels/second by default; wave difficulty changes only spawn gaps.
 
 The top speed button and F key cycle Normal 1x, Fast 2x, and Ultra 4x. Villagers can travel across the board for reachable seeds, then return to deliver them. Forage Radius is retained for compatibility but no longer limits collection.
+
+## Later-level pressure
+
+Level 5 starts anomalies within the first 1–3 spawned soldiers, followed by random gaps of 3–8 soldiers. Level 8 starts random groups of 1–3 soldiers per camp per pulse. Level 9 onward chooses a rescue goal of 6–15 and has a 35% chance of adding one camp on either team. Camps change entry rows when Vary Level Layout is enabled. Each camp spawns; soldiers choose a reachable opposing camp, all entry tiles are protected from planting, and any camp falling fails the rescue. These rules live in `scripts/systems/level_director.gd` and shared Inspector settings.
+
+Camp attacks are single-use: soldiers and anomalies wait the configured attack interval, deal exactly one damage, then die and are removed. Even a large frame delta cannot repeat a camp hit.

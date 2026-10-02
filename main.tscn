@@ -66,15 +66,9 @@ position = Vector2(420, 260)
 [node name="Peaceful3" parent="Board/People" index="2" unique_id=1207044759 instance=ExtResource("6")]
 position = Vector2(380, 300)
 
-[node name="Peaceful4" parent="Board/People" index="3" unique_id=854610676 instance=ExtResource("6")]
-position = Vector2(340, 340)
-
-[node name="Peaceful5" parent="Board/People" index="4" unique_id=1149033027 instance=ExtResource("6")]
-position = Vector2(420, 340)
-
 [node name="Village" parent="Board" unique_id=518271316 instance=ExtResource("12")]
 z_index = -1
-position = Vector2(380, 297)
+position = Vector2(380, 465)
 
 [node name="Camps" type="Node2D" parent="." unique_id=243223548]
 

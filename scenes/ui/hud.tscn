@@ -56,7 +56,7 @@ offset_right = 645.0
 offset_bottom = 43.0
 mouse_filter = 2
 theme_override_font_sizes/font_size = 18
-text = "RESCUED 0 / 10"
+text = "RESCUED 0 / 5"
 
 [node name="Level" type="Label" parent="Root/TopBar"]
 offset_left = 660.0
@@ -82,7 +82,7 @@ offset_top = 47.0
 offset_right = 640.0
 offset_bottom = 55.0
 mouse_filter = 2
-max_value = 10.0
+max_value = 5.0
 value = 0.0
 show_percentage = false
 
@@ -139,7 +139,7 @@ text = "Lost: 0"
 layout_mode = 2
 mouse_filter = 2
 theme_override_font_sizes/font_size = 14
-text = "Rescue: 10"
+text = "Rescue: 5"
 custom_minimum_size = Vector2(0, 32)
 
 [node name="Spawned" type="Label" parent="Root/Population"]
@@ -201,14 +201,14 @@ offset_top = 120.0
 offset_right = 1077.0
 offset_bottom = 328.0
 mouse_filter = 2
-theme_override_constants/separation = 6
+theme_override_constants/separation = 4
 
 [node name="Title" type="Label" parent="Root/Controls"]
 layout_mode = 2
 mouse_filter = 2
 theme_override_font_sizes/font_size = 14
 text = "FOREST"
-custom_minimum_size = Vector2(0, 35)
+custom_minimum_size = Vector2(0, 20)
 
 [node name="Collect" type="Label" parent="Root/Controls"]
 layout_mode = 2
@@ -279,7 +279,7 @@ offset_right = 920.0
 offset_bottom = 744.0
 mouse_filter = 2
 theme_override_font_sizes/font_size = 17
-text = "Rescue 10 people before either camp falls."
+text = "Rescue 5 people before either camp falls."
 
 [node name="Delivered" type="Label" parent="Root"]
 offset_left = 22.0

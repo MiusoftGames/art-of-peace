@@ -81,14 +81,14 @@ func step(delta: float, game: Node) -> void:
 	if peaceful:
 		visit_village(delta, game)
 		return
-	var target: Vector2i = game.hostile_destination(team)
+	var target: Vector2i = game.hostile_destination(team, cell)
 	if cell == target:
 		attack_elapsed += delta
 		var interval: float = maxf(0.1, game.settings.building_attack_interval)
 		while attack_elapsed >= interval:
 			attack_elapsed -= interval
 			game.attack_destination(self)
-			if game.lost or game.won:
+			if dead or game.lost or game.won:
 				attack_elapsed = 0.0
 				break
 		return

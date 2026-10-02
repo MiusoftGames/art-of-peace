@@ -40,13 +40,16 @@ var battle_winner := -1
 var won := false
 var rescued := 0
 var failure_reason := ""
+var anomaly_remaining := 1
+var previous_layout: Array[Vector2i] = []
 
 func _ready() -> void:
 	rng.randomize()
 	board.settings = settings
 	stock = settings.starting_seeds
-	preload("res://scripts/world/level_layout.gd").apply(self)
 	goal = mini(settings.maximum_rescue_goal, settings.first_goal + (level - 1) * settings.goal_increment)
+	preload("res://scripts/systems/level_director.gd").configure(self)
+	preload("res://scripts/world/level_layout.gd").apply(self)
 	waves.configure(settings)
 	waves.level_offset = 0
 	waves.spawn_remaining = waves.interval()
@@ -82,6 +85,7 @@ func load_round(number: int) -> void:
 	var fresh = load("res://main.tscn").instantiate()
 	fresh.level = number
 	fresh.settings = settings
+	fresh.previous_layout.assign([village.home_cell(board), board.cell_at($Board/Gates/BlueGate.position)])
 	var tree := get_tree()
 	tree.root.add_child(fresh)
 	tree.current_scene = fresh
@@ -118,28 +122,53 @@ func make_person(team: int, cell: Vector2i, peaceful := false, anomaly := false)
 	register_person(person)
 	return person
 
+func camp_cell(camp: ArmyCamp) -> Vector2i:
+	return board.cell_at(board.to_local(camp.get_node("SpawnPoint").global_position))
+
 func spawn_cell(team: int) -> Vector2i:
 	var camp := get_camp(team)
-	if camp != null:
-		return board.cell_at(board.to_local(camp.get_node("SpawnPoint").global_position))
-	return Vector2i.ZERO
+	return camp_cell(camp) if camp != null else Vector2i.ZERO
+
+func get_camps(team: int) -> Array[ArmyCamp]:
+	var found: Array[ArmyCamp] = []
+	for camp in $Camps.get_children():
+		if camp is ArmyCamp and camp.team == team and not camp.defeated:
+			found.append(camp)
+	return found
 
 func get_camp(team: int) -> ArmyCamp:
-	for camp in $Camps.get_children():
-		if camp is ArmyCamp and camp.team == team:
-			return camp
-	return null
+	var camps := get_camps(team)
+	return camps[0] if not camps.is_empty() else null
 
-func hostile_destination(team: int) -> Vector2i:
-	return spawn_cell(1 - team)
+func hostile_destination(team: int, from := Vector2i(-1, -1)) -> Vector2i:
+	var camps := get_camps(1 - team)
+	if from == Vector2i(-1, -1):
+		return spawn_cell(1 - team)
+	var targets: Dictionary = {}
+	for camp in camps:
+		targets[camp_cell(camp)] = true
+	if targets.has(from):
+		return from
+	var route := GridPathfinding.find_path(board, from, targets, trees)
+	if not route.is_empty():
+		return route.back()
+	var closest := spawn_cell(1 - team)
+	for camp in camps:
+		if from.distance_squared_to(camp_cell(camp)) < from.distance_squared_to(closest):
+			closest = camp_cell(camp)
+	return closest
 
 func attack_destination(person: PeacePerson) -> void:
 	if won or lost or person.peaceful or person.dead or person.retreated:
 		return
-	if person.cell == spawn_cell(1 - person.team):
-		var camp := get_camp(1 - person.team)
-		if camp != null and camp.take_damage(settings.building_attack_damage):
-			declare_army_winner(person.team)
+	for camp in get_camps(1 - person.team):
+		if person.cell == camp_cell(camp):
+			var defeated := camp.take_damage(1)
+			person.dead = true
+			record_death(person)
+			if defeated:
+				declare_army_winner(person.team)
+			return
 
 func declare_army_winner(team: int) -> void:
 	battle_winner = team
@@ -152,7 +181,10 @@ func is_matching_gate(cell: Vector2i, team: int) -> bool:
 	return false
 
 func protected(cell: Vector2i) -> bool:
-	return village.is_building_cell(cell, board) or cell == spawn_cell(0) or cell == spawn_cell(1) or is_gate_cell(cell)
+	for camp in $Camps.get_children():
+		if camp is ArmyCamp and cell == camp_cell(camp):
+			return true
+	return village.is_building_cell(cell, board) or is_gate_cell(cell)
 
 func is_gate_cell(cell: Vector2i) -> bool:
 	return is_matching_gate(cell, 0) or is_matching_gate(cell, 1)
@@ -273,24 +305,24 @@ func find_anomaly_path(from: Vector2i, target: Vector2i) -> Array[Vector2i]:
 	return GridPathfinding.find_path(board, from, {target: true}, gates)
 
 func spawn_pair() -> void:
-	# If this pair contains an anomaly, choose its team alternately.
-	var teams := [0, 1]
-	var frequency := maxi(1, settings.anomaly_every)
-	var anomalies_enabled := level >= settings.anomaly_start_level
-	var first_is_anomaly := anomalies_enabled and (spawned + 1) % frequency == 0
-	var second_is_anomaly := anomalies_enabled and (spawned + 2) % frequency == 0
-	var preferred_team := 1 if anomaly_count % 2 == 0 else 0
-	if (first_is_anomaly and preferred_team == 1) or (not first_is_anomaly and second_is_anomaly and preferred_team == 0):
-		teams = [1, 0]
 	if lost or won:
 		return
-	for team in teams:
-		spawned += 1
-		var anomaly := anomalies_enabled and spawned % frequency == 0
-		make_person(team, spawn_cell(team), false, anomaly)
-		if anomaly:
-			anomaly_count += 1
-			notify_player("Anomaly! Its unpredictable route breaks through trees.")
+	for camp in $Camps.get_children():
+		if not camp is ArmyCamp or camp.defeated:
+			continue
+		var count := rng.randi_range(1, settings.maximum_spawn_group) if level > settings.burst_after_level else 1
+		for index in range(count):
+			spawned += 1
+			var anomaly := false
+			if level >= settings.anomaly_start_level:
+				anomaly_remaining -= 1
+				if anomaly_remaining <= 0:
+					anomaly = true
+					anomaly_remaining = rng.randi_range(settings.anomaly_gap_min, maxi(settings.anomaly_gap_min, settings.anomaly_gap_max))
+			make_person(camp.team, camp_cell(camp), false, anomaly)
+			if anomaly:
+				anomaly_count += 1
+				notify_player("Anomaly! Its unpredictable route breaks through trees.")
 
 func record_death(person: PeacePerson) -> void:
 	deaths += 1
