@@ -10,23 +10,26 @@ The main scene now contains real scene instances instead of a drawing generated 
 ArtOfPeace
   Background                 sand ColorRect
   Board                      instance of scenes/world/forest.tscn
-    Ground                   teal ColorRect
-    Gates                    drag BlueGate / RedGate to new tiles
-    Trees                    empty by default; runtime trees live here
-    Seeds                    eight editable starting seed instances
-    People                   five editable starting peaceful people
-    Effects                  temporary ripple instances
-    PlacementPreview         image cursor
+	Ground                   teal ColorRect
+	Village                  top-middle home and seed delivery destination
+	Gates                    drag BlueGate / RedGate to new tiles
+	Trees                    empty by default; runtime trees live here
+	Seeds                    eight editable starting seed instances
+	People                   five editable starting peaceful people
+	Effects                  temporary ripple instances
+	PlacementPreview         image cursor
   Camps
-    BlueCamp / RedCamp        camp scene instances
-      SpawnPoint             Marker2D: where that army enters the board
+	BlueCamp / RedCamp        camp scene instances
+	  SpawnPoint             Marker2D: where that army enters the board
   Systems
-    Waves / SeedSpawner / Combat
+	Waves / SeedSpawner / Combat
   HUD                        instance of scenes/ui/hud.tscn
 ```
 
 - Move gates, starting people, and starting seeds with the 2D editor's Move tool. Their grid cells are read from the scene positions at runtime. The board's top-left is its local origin; default cell centers are **20 + 40 × column**, **20 + 40 × row**.
+- Move **Board/Village** to change where peaceful people settle and deliver seeds. Select its root to tune **Wander Radius** (2 tiles by default) and **Forage Radius** (4 tiles). The village delivery tile is protected from tree planting. Villagers reserve separate nearby seeds, show a carried seed, and credit your stock only when they return; death loses the carried seed.
 - Move a camp's **SpawnPoint** marker to change its entry tile. Changing the camp's position also moves its marker; keep both entry markers within the forest.
+- Camps have **Max Health** (20 by default), and the village has **Max Health** (30). Select the corresponding scene root to edit it; save and restart to apply the new starting health. Health bars and HP labels are real editable scene controls.
 - Duplicate/delete instances under **Board/People** to edit the starting population. The `peaceful_person.tscn` variant is already configured as peaceful.
 - Drag `seed.tscn` into **Board/Seeds** for more starting seeds. Drag `tree.tscn` into **Board/Trees** if you intentionally want a preplanted tree. The default level has none.
 - Keep each seed/tree on a distinct tile. Camps and gates should remain within the grid and retain one camp for each team.
@@ -42,6 +45,7 @@ Select the **ArtOfPeace** root and expand **Settings**, or open **resources/defa
 | Survival Goals | First goal and increase per level |
 | Waves | Pairs per wave, initial/minimum gap, acceleration, rest duration, anomaly frequency |
 | People | Movement speed, speed increase per level, contact distance, wandering pauses |
+| Camp and Village Attacks | Time between building attacks and damage per hit |
 | Trees and Seeds | Tree cost, cutting time, seed spawn interval, maximum seeds |
 | Anomaly Routes | Detour chance/size and route segment lengths |
 
@@ -58,6 +62,7 @@ All object art is now **transparent PNG image files** in **assets/sprites/**. Ma
 | `scenes/entities/person.tscn` | Select the root → **Images** → Blue Texture, Red Texture, Peaceful Texture |
 | `blue_soldier.tscn`, `red_soldier.tscn`, `peaceful_person.tscn`, `anomaly.tscn` | Inherited person variants; override their image fields or speed multiplier |
 | `tree.tscn`, `seed.tscn` | Select **Sprite2D** → Texture |
+| `village.tscn` | Select **Sprite2D** → Texture; its Label is editable too |
 | `peace_gate.tscn`, `army_camp.tscn` | Select the root → Blue Texture / Red Texture |
 | `person.tscn` marker and halo | Select **AnomalyMarker** or **PeaceHalo** → Texture |
 | `ripple.tscn` | Select **Sprite2D** → Texture |
@@ -70,8 +75,9 @@ Open **scenes/ui/hud.tscn** to move labels/buttons, edit help text, and change l
 
 | Code file | Responsibility |
 | --- | --- |
-| `scripts/game.gd` | Session state, input, resource collection, level goals, instantiation |
-| `scripts/entities/person.gd` | Soldier movement, peaceful wandering, anomaly routes, cutting, gate conversion |
+| `scripts/game.gd` | Session state, input, resource collection, level goals, army victory, siege targets, instantiation |
+| `scripts/entities/person.gd` | Camp-bound soldiers, village visits/seed delivery, gate-avoiding anomaly routes, cutting, conversion |
+| `scripts/entities/village.gd` | Village destination, wandering and foraging radii |
 | `scripts/systems/pathfinding.gd` | Grid breadth-first search |
 | `scripts/systems/waves.gd` | Endless wave timing and acceleration |
 | `scripts/systems/seed_spawner.gd` | Seed spawn timing |
@@ -81,3 +87,7 @@ Open **scenes/ui/hud.tscn** to move labels/buttons, edit help text, and change l
 | `scripts/settings/game_settings.gd` | Exported Inspector properties |
 
 Open **tests/run_checks.tscn** and press **F6** to run the gameplay regression checks. These use fresh main-scene instances, including the real entity scenes, and leave the saved level unchanged. Press **F5** to return to the game.
+
+## Camp battle and village invasion
+
+Before an army wins, hostile people head for the opposing camp's entry marker. On reaching it, they attack at the configured interval. The first defeated camp ends the war: hostile members of the losing army withdraw, its peaceful members stay, and only the winner continues spawning. Both normal and anomaly winners now head toward the village; anomaly routes still avoid gate tiles. The village's health reaching zero ends the game, alongside the existing zero-survivor loss condition. The survival goals and resource loop continue through both phases.

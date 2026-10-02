@@ -9,7 +9,7 @@ func _ready() -> void:
 		if not checks[check_name]:
 			failures.append(check_name)
 	var summary := "%d / %d checks passed" % [checks.size() - failures.size(), checks.size()]
-	$Results.text = summary + "\n\n" + report
+	$Scroll/Results.text = summary + "\n\n" + report
 	print(summary)
 	if not failures.is_empty():
 		push_error("Failed checks: " + ", ".join(failures))

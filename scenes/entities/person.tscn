@@ -1,9 +1,10 @@
-[gd_scene load_steps=5 format=3]
+[gd_scene load_steps=6 format=3]
 
 [ext_resource type="Script" path="res://scripts/entities/person.gd" id="1"]
 [ext_resource type="Texture2D" path="res://assets/sprites/person_blue.png" id="2"]
 [ext_resource type="Texture2D" path="res://assets/sprites/anomaly_marker.png" id="3"]
 [ext_resource type="Texture2D" path="res://assets/sprites/peace_halo.png" id="4"]
+[ext_resource type="Texture2D" path="res://assets/sprites/seed.png" id="5"]
 
 [node name="Person" type="Node2D"]
 script = ExtResource("1")
@@ -20,4 +21,10 @@ texture = ExtResource("3")
 visible = false
 position = Vector2(0, -12)
 texture = ExtResource("4")
+
+[node name="CarriedSeed" type="Sprite2D" parent="."]
+visible = false
+position = Vector2(11, 5)
+scale = Vector2(0.55, 0.55)
+texture = ExtResource("5")
 

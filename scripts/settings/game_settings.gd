@@ -33,6 +33,10 @@ extends Resource
 @export_range(0.0, 5.0, 0.1) var peaceful_wait_min := 0.3
 @export_range(0.0, 5.0, 0.1) var peaceful_wait_max := 1.0
 
+@export_category("Camp and Village Attacks")
+@export_range(0.1, 5.0, 0.1) var building_attack_interval := 1.0
+@export_range(1, 20) var building_attack_damage := 1
+
 @export_category("Trees and Seeds")
 @export_range(1, 10) var tree_cost := 1
 @export_range(0.1, 10.0, 0.1) var tree_cut_seconds := 2.0

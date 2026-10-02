@@ -22,11 +22,14 @@ func update_status(game: Node) -> void:
 	$Root/Population/Deaths.text = "Lost: %d" % game.deaths
 	$Root/Population/Goal.text = "Goal: %d alive" % game.goal
 	$Root/Population/Spawned.text = "Spawned: %d" % game.spawned
+	$Root/Delivered.text = "Delivered: %d" % game.delivered
 	$Root/WaveStatus/Wave.text = "Wave %d" % game.waves.wave
+	$Root/WaveStatus/Phase.text = "War: camps" if game.battle_winner == -1 else ("Blue: village" if game.battle_winner == 0 else "Red: village")
 	$Root/WaveStatus/Countdown.text = "Rest: %.0fs" % ceilf(game.waves.rest_remaining) if game.waves.rest_remaining > 0 else "Next: %.0fs" % ceilf(game.waves.spawn_remaining)
 	$Root/Controls/TreeCost.text = "%d seed / tree" % game.settings.tree_cost
 	$Root/Controls/Speed.text = "F: speed %dx" % int(game.speed)
 	$Root/Anomaly/Description.text = "Every %dth\nspawn breaks\nthrough trees." % game.settings.anomaly_every
 	$Root/Message.text = game.message
 	$Root/GameOver.visible = game.lost
+	$Root/GameOver/Title.text = "VILLAGE DESTROYED" if game.village.health <= 0 else "NO PEACEFUL SURVIVORS"
 	$Root/GameOver/Details.text = "Level %d  /  wave %d  /  %d converted" % [game.level, game.waves.wave, game.converted]

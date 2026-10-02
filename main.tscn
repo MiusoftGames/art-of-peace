@@ -11,6 +11,7 @@
 [ext_resource type="PackedScene" path="res://scenes/systems/waves.tscn" id="9"]
 [ext_resource type="Script" uid="uid://fe1c0ucs17f4" path="res://scripts/systems/seed_spawner.gd" id="10"]
 [ext_resource type="Script" uid="uid://kfkrmnjlhlb2" path="res://scripts/systems/combat.gd" id="11"]
+[ext_resource type="PackedScene" path="res://scenes/entities/village.tscn" id="12"]
 
 [node name="ArtOfPeace" type="Node2D" unique_id=361417616]
 script = ExtResource("1")
@@ -71,10 +72,17 @@ position = Vector2(340, 340)
 [node name="Peaceful5" parent="Board/People" index="4" unique_id=1149033027 instance=ExtResource("6")]
 position = Vector2(420, 340)
 
+[node name="Village" parent="Board" unique_id=518271316 instance=ExtResource("12")]
+z_index = -1
+position = Vector2(380, 297)
+
 [node name="Camps" type="Node2D" parent="." unique_id=243223548]
 
 [node name="BlueCamp" parent="Camps" unique_id=483886741 instance=ExtResource("4")]
 position = Vector2(75, 400)
+
+[node name="Description" parent="Camps/BlueCamp" index="2"]
+text = "HP: 20 / 20"
 
 [node name="RedCamp" parent="Camps" unique_id=189574477 instance=ExtResource("4")]
 position = Vector2(1005, 400)
@@ -86,7 +94,10 @@ texture = ExtResource("7_efxa6")
 [node name="NameLabel" parent="Camps/RedCamp" index="1"]
 text = "RED CAMP"
 
-[node name="SpawnPoint" parent="Camps/RedCamp" index="3"]
+[node name="Description" parent="Camps/RedCamp" index="2"]
+text = "HP: 20 / 20"
+
+[node name="SpawnPoint" parent="Camps/RedCamp" index="4"]
 position = Vector2(-105, 0)
 
 [node name="Systems" type="Node" parent="." unique_id=826727774]

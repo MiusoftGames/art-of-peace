@@ -32,6 +32,16 @@ theme_override_font_sizes/font_size = 13
 text = "Endless waves"
 horizontal_alignment = 1
 
+[node name="HealthBar" type="ProgressBar" parent="."]
+offset_left = -40.0
+offset_top = 26.0
+offset_right = 40.0
+offset_bottom = 34.0
+mouse_filter = 2
+max_value = 20.0
+value = 20.0
+show_percentage = false
+
 [node name="SpawnPoint" type="Marker2D" parent="."]
 position = Vector2(105, 0)
 

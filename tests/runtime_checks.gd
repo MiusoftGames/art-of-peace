@@ -13,10 +13,12 @@ func run(parent: Node) -> Dictionary:
 	check_resources_and_layout()
 	check_seed_and_trees()
 	check_waves()
-	check_hunting_and_combat()
+	check_targets_and_combat()
 	check_goals_and_loss()
 	check_anomalies_and_gates()
 	check_normal_cutting()
+	check_village_and_deliveries()
+	check_camp_victory_and_village_attack()
 	return results.duplicate()
 
 func fresh_game() -> Node:
@@ -85,14 +87,15 @@ func check_waves() -> void:
 	results["next wave starts"] = game.waves.wave == 2 and game.waves.pairs_sent == 0
 	game.free()
 
-func check_hunting_and_combat() -> void:
+func check_targets_and_combat() -> void:
 	for team in range(2):
 		var game := fresh_game()
 		clear_people(game)
 		var prey: PeacePerson = game.make_person(team, Vector2i(9, 4), true)
 		var hunter: PeacePerson = game.make_person(team, Vector2i(8, 4))
 		hunter.step(0.0, game)
-		results["team %d hunts its own peaceful people" % team] = hunter.next_cell == prey.cell
+		var enemy_path: Array[Vector2i] = game.find_path(hunter.cell, game.spawn_cell(1 - team))
+		results["team %d aims for enemy camp, not peaceful people" % team] = hunter.next_cell == enemy_path[0] and hunter.next_cell != prey.cell
 		hunter.position = prey.position
 		game.combat.resolve(game)
 		results["team %d kills peaceful person and survives" % team] = game.soldiers.size() == 1 and game.soldiers[0] == hunter and not hunter.dead
@@ -157,9 +160,92 @@ func check_anomalies_and_gates() -> void:
 	breaker.step(0.0, game)
 	breaker.step(0.5, game)
 	results["anomaly destroys tree on contact"] = not game.trees.has(Vector2i(6, 7))
+	var gate: PeaceGate = game.get_node("Board/Gates/BlueGate")
+	gate.position = game.board.point(Vector2i(6, 7))
+	var avoider: PeacePerson = game.make_person(0, Vector2i(5, 7), false, true)
+	avoider.waypoint = Vector2i(6, 7)
+	avoider.route_steps = 3
+	avoider.step(0.0, game)
+	var gate_route: Array[Vector2i] = game.find_anomaly_path(Vector2i(5, 7), game.spawn_cell(1))
+	results["anomaly detours around gate in its way"] = avoider.next_cell != Vector2i(6, 7) and not gate_route.has(Vector2i(6, 7)) and not avoider.peaceful
+	var avoided_all_gates := true
+	for i in range(600):
+		avoider.step(0.1, game)
+		if game.is_gate_cell(avoider.next_cell) or avoider.peaceful:
+			avoided_all_gates = false
+	results["anomaly route never crosses either gate"] = avoided_all_gates
+	gate.position = game.board.point(Vector2i(4, 12))
 	var walker: PeacePerson = game.make_person(0, Vector2i(4, 12), false, true)
 	walker.step(0.0, game)
 	results["gate converts anomaly on contact"] = walker.peaceful and game.converted == 1
+	game.free()
+
+func check_village_and_deliveries() -> void:
+	var game := fresh_game()
+	clear_people(game)
+	clear_seeds(game)
+	var home: Vector2i = game.village.home_cell(game.board)
+	results["village starts at middle top"] = home == Vector2i(9, 1)
+	game.stock = 1
+	results["village delivery tile cannot be blocked"] = not game.plant(home)
+	game.stock = 0
+	var seed_node := game.seed_scene.instantiate() as PeaceSeed
+	seed_node.cell = Vector2i(9, 3)
+	seed_node.position = game.board.point(seed_node.cell)
+	game.get_node("Board/Seeds").add_child(seed_node)
+	game.seeds[seed_node.cell] = seed_node
+	var person: PeacePerson = game.make_person(-1, Vector2i(9, 5), true)
+	person.step(0.0, game)
+	results["peaceful person heads to village first"] = person.next_cell == Vector2i(9, 4) and not person.reached_village and person.carried_seeds == 0
+	var picked_up := false
+	for i in range(200):
+		person.step(0.1, game)
+		if person.carried_seeds > 0:
+			picked_up = true
+			break
+	results["villager picks up seed after visiting village"] = picked_up and person.reached_village and not game.seeds.has(Vector2i(9, 3))
+	results["pickup waits for delivery to credit stock"] = game.stock == 0 and game.delivered == 0 and person.get_node("CarriedSeed").visible
+	for i in range(150):
+		person.step(0.1, game)
+		if game.delivered > 0:
+			break
+	results["return to village credits exactly one seed"] = game.stock == 1 and game.delivered == 1 and person.carried_seeds == 0 and person.cell == home and not person.get_node("CarriedSeed").visible
+	var stayed_near := true
+	for i in range(200):
+		person.step(0.1, game)
+		if not game.village.within_home_area(person.next_cell, game.board):
+			stayed_near = false
+	results["idle villagers stay around village"] = stayed_near
+	game.free()
+	game = fresh_game()
+	clear_people(game)
+	clear_seeds(game)
+	var collector: PeacePerson = game.make_person(-1, Vector2i(9, 3), true)
+	collector.reached_village = true
+	collector.carried_seeds = 1
+	game.make_person(0, Vector2i(9, 3))
+	game.combat.resolve(game)
+	results["dead carrier does not credit undelivered seed"] = game.stock == 0 and game.delivered == 0 and game.peaceful_count() == 0
+	game.free()
+	game = fresh_game()
+	clear_people(game)
+	clear_seeds(game)
+	var reserved_seed := game.seed_scene.instantiate() as PeaceSeed
+	reserved_seed.cell = Vector2i(9, 3)
+	reserved_seed.position = game.board.point(reserved_seed.cell)
+	game.get_node("Board/Seeds").add_child(reserved_seed)
+	game.seeds[reserved_seed.cell] = reserved_seed
+	var first: PeacePerson = game.make_person(-1, home, true)
+	var second: PeacePerson = game.make_person(-1, home, true)
+	first.reached_village = true
+	second.reached_village = true
+	first.step(0.0, game)
+	second.step(0.0, game)
+	results["villagers reserve different seeds"] = first.seed_target == Vector2i(9, 3) and second.seed_target == Vector2i(-1, -1)
+	game.collect_at(reserved_seed.position)
+	for i in range(30):
+		first.step(0.1, game)
+	results["player pickup safely cancels villager reservation"] = first.seed_target == Vector2i(-1, -1) and first.carried_seeds == 0 and game.stock == 1 and game.delivered == 0
 	game.free()
 
 func check_normal_cutting() -> void:
@@ -182,3 +268,56 @@ func clear_people(game: Node) -> void:
 	for person in game.soldiers:
 		person.free()
 	game.soldiers.clear()
+	game.seed_claims.clear()
+
+func check_camp_victory_and_village_attack() -> void:
+	for team in range(2):
+		var game := fresh_game()
+		var enemy_camp: ArmyCamp = game.get_camp(1 - team)
+		enemy_camp.health = 2
+		enemy_camp.refresh_health()
+		var siege_cell: Vector2i = game.spawn_cell(1 - team)
+		var attacker: PeacePerson = game.make_person(team, siege_cell)
+		var defeated_soldier: PeacePerson = game.make_person(1 - team, Vector2i(10, 10))
+		var survivor: PeacePerson = game.make_person(1 - team, Vector2i(11, 10), true)
+		var anomaly: PeacePerson = game.make_person(team, Vector2i(9, 9), false, true)
+		anomaly.waypoint = siege_cell
+		anomaly.route_steps = 5
+		attacker.step(0.5, game)
+		results["team %d attack waits for interval" % team] = enemy_camp.health == 2
+		attacker.step(0.5, game)
+		results["team %d damages opposing camp" % team] = enemy_camp.health == 1 and game.battle_winner == -1
+		attacker.step(1.0, game)
+		results["team %d wins when enemy camp falls" % team] = enemy_camp.defeated and enemy_camp.health == 0 and game.battle_winner == team and game.get_camp(team).health == game.get_camp(team).max_health
+		results["team %d defeat withdraws only hostile losers" % team] = defeated_soldier.retreated and not survivor.retreated and not survivor.dead
+		results["team %d victory resets anomaly destination" % team] = anomaly.route_steps == 0 and anomaly.waypoint == game.village.home_cell(game.board)
+		game.combat.resolve(game)
+		results["team %d retreat adds no deaths" % team] = game.deaths == 0 and not game.soldiers.has(defeated_soldier)
+		var count: int = game.spawned
+		game.spawn_pair()
+		var last: PeacePerson = game.soldiers.back()
+		results["team %d alone spawns after victory" % team] = game.spawned == count + 1 and last.team == team
+		attacker.step(0.0, game)
+		var village_path: Array[Vector2i] = game.find_path(siege_cell, game.village.home_cell(game.board))
+		results["team %d winning soldiers target village" % team] = game.hostile_destination(team) == game.village.home_cell(game.board) and attacker.next_cell == village_path[0]
+		var peaceful_attacker: PeacePerson = game.make_person(team, game.village.home_cell(game.board), true)
+		var village_hp: int = game.village.health
+		game.attack_destination(peaceful_attacker)
+		results["team %d peaceful people never damage village" % team] = game.village.health == village_hp
+		clear_people(game)
+		var raider: PeacePerson = game.make_person(team, game.village.home_cell(game.board))
+		raider.step(1.0, game)
+		results["team %d winning army damages village" % team] = game.village.health == village_hp - game.settings.building_attack_damage
+		# Leave a peaceful survivor elsewhere: village destruction must itself end play.
+		game.make_person(-1, Vector2i(1, 1), true)
+		game.village.health = 1
+		game.running = true
+		game.advance(1.0)
+		results["team %d village destruction ends game" % team] = game.village.health == 0 and game.lost and not game.running and game.peaceful_count() > 0
+		game.free()
+
+func clear_seeds(game: Node) -> void:
+	for seed_node in game.seeds.values():
+		seed_node.free()
+	game.seeds.clear()
+	game.seed_claims.clear()

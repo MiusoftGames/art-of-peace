@@ -4,11 +4,11 @@ extends Node
 func resolve(game: Node) -> void:
 	for i in range(game.soldiers.size()):
 		var a: PeacePerson = game.soldiers[i]
-		if a.dead:
+		if a.dead or a.retreated:
 			continue
 		for j in range(i + 1, game.soldiers.size()):
 			var b: PeacePerson = game.soldiers[j]
-			if b.dead or (a.peaceful and b.peaceful) or (not a.peaceful and not b.peaceful and a.team == b.team):
+			if b.dead or b.retreated or (a.peaceful and b.peaceful) or (not a.peaceful and not b.peaceful and a.team == b.team):
 				continue
 			if a.position.distance_to(b.position) < game.settings.contact_distance:
 				if not b.peaceful:
@@ -22,6 +22,6 @@ func resolve(game: Node) -> void:
 				if a.dead:
 					break
 	for i in range(game.soldiers.size() - 1, -1, -1):
-		if game.soldiers[i].dead:
+		if game.soldiers[i].dead or game.soldiers[i].retreated:
 			game.soldiers[i].queue_free()
 			game.soldiers.remove_at(i)

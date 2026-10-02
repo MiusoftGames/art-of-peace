@@ -33,11 +33,20 @@ extends Node2D
 var cell := Vector2i.ZERO
 var next_cell := Vector2i.ZERO
 var dead := false
-var returning := false
+var retreated := false
+var attack_elapsed := 0.0
 var wait_remaining := 0.0
 var cut_elapsed := 0.0
 var waypoint := Vector2i(-1, -1)
 var route_steps := 0
+var reached_village := false
+var seed_target := Vector2i(-1, -1)
+var carried_seeds := 0:
+	set(value):
+		carried_seeds = value
+		var carried_sprite := get_node_or_null("CarriedSeed") as Sprite2D
+		if carried_sprite != null:
+			carried_sprite.visible = carried_seeds > 0
 
 func _ready() -> void:
 	refresh_sprite()
@@ -54,7 +63,7 @@ func refresh_sprite() -> void:
 		halo.visible = peaceful
 
 func step(delta: float, game: Node) -> void:
-	if dead:
+	if dead or retreated:
 		return
 	var destination: Vector2 = game.board.point(next_cell)
 	if position.distance_to(destination) > 0.1:
@@ -70,20 +79,27 @@ func step(delta: float, game: Node) -> void:
 		game.converted += 1
 		game.emit_effect(position, Color.WHITE)
 	if peaceful:
-		wander(delta, game)
+		visit_village(delta, game)
 		return
-	var target: Vector2i = game.spawn_cell(1 - team) if not returning else game.spawn_cell(team)
+	var target: Vector2i = game.hostile_destination(team)
+	if cell == target:
+		attack_elapsed += delta
+		var interval: float = maxf(0.1, game.settings.building_attack_interval)
+		while attack_elapsed >= interval:
+			attack_elapsed -= interval
+			game.attack_destination(self)
+			if game.hostile_destination(team) != cell or game.village.health <= 0:
+				attack_elapsed = 0.0
+				break
+		return
+	attack_elapsed = 0.0
 	if anomaly:
 		move_anomaly(target, game)
 		return
-	var path: Array[Vector2i] = game.find_hunt_path(cell)
-	if path.is_empty():
-		path = game.find_path(cell, target)
+	var path: Array[Vector2i] = game.find_path(cell, target)
 	if not path.is_empty():
 		next_cell = path[0]
 		cut_elapsed = 0.0
-	elif cell == target:
-		returning = not returning
 	else:
 		var blocked_path: Array[Vector2i] = game.find_path(cell, target, true)
 		if not blocked_path.is_empty():
@@ -97,42 +113,78 @@ func step(delta: float, game: Node) -> void:
 			else:
 				next_cell = blocked_path[0]
 
-func wander(delta: float, game: Node) -> void:
+func visit_village(delta: float, game: Node) -> void:
+	var home: Vector2i = game.village.home_cell(game.board)
+	if carried_seeds > 0:
+		if cell == home:
+			game.deliver_seeds(self)
+			wait_remaining = game.settings.peaceful_wait_min
+		else:
+			follow_path(game.find_path(cell, home))
+		return
+	if not reached_village:
+		if cell != home:
+			follow_path(game.find_path(cell, home))
+			return
+		reached_village = true
+	# The player or another villager may have collected our reserved seed.
+	if seed_target != Vector2i(-1, -1):
+		if not game.seeds.has(seed_target):
+			game.release_seed_claim(self)
+		elif cell == seed_target:
+			if game.take_seed(cell):
+				carried_seeds = 1
+			game.release_seed_claim(self)
+			return
+		else:
+			var route: Array[Vector2i] = game.find_path(cell, seed_target)
+			if not route.is_empty():
+				follow_path(route)
+				return
+			game.release_seed_claim(self)
+	if not game.village.within_home_area(cell, game.board):
+		follow_path(game.find_path(cell, home))
+		return
 	wait_remaining -= delta
 	if wait_remaining > 0.0:
 		return
+	if game.seeds.has(cell) and game.village.within_forage_area(cell, game.board):
+		if game.take_seed(cell):
+			carried_seeds = 1
+			return
+	var seed_path: Array[Vector2i] = game.find_seed_path(self)
+	if not seed_path.is_empty():
+		seed_target = seed_path.back()
+		follow_path(seed_path)
+		return
+	wander_near_village(game)
+
+func follow_path(path: Array[Vector2i]) -> void:
+	if not path.is_empty():
+		next_cell = path[0]
+
+func wander_near_village(game: Node) -> void:
 	var options: Array[Vector2i] = []
 	for direction in GridPathfinding.DIRECTIONS:
 		var neighbor: Vector2i = cell + direction
-		if game.board.inside(neighbor) and not game.trees.has(neighbor):
+		if game.board.inside(neighbor) and not game.trees.has(neighbor) and game.village.within_home_area(neighbor, game.board):
 			options.append(neighbor)
 	if not options.is_empty():
 		next_cell = options[game.rng.randi_range(0, options.size() - 1)]
 	wait_remaining = game.rng.randf_range(game.settings.peaceful_wait_min, maxf(game.settings.peaceful_wait_min, game.settings.peaceful_wait_max))
 
 func move_anomaly(target: Vector2i, game: Node) -> void:
-	var nearest_distance := INF
-	for person in game.soldiers:
-		if person.peaceful and not person.dead:
-			var distance: float = position.distance_squared_to(person.position)
-			if distance < nearest_distance:
-				nearest_distance = distance
-				target = person.cell
-	if cell == target:
-		returning = not returning
-		return
 	if route_steps <= 0 or cell == waypoint:
 		if game.rng.randf() < game.settings.detour_chance:
 			waypoint = Vector2i(game.rng.randi_range(mini(cell.x, target.x), maxi(cell.x, target.x)), clampi(target.y + game.rng.randi_range(-game.settings.detour_rows, game.settings.detour_rows), 0, game.settings.grid_size.y - 1))
 		else:
 			waypoint = target
 		route_steps = game.rng.randi_range(game.settings.route_steps_min, maxi(game.settings.route_steps_min, game.settings.route_steps_max))
-	var directions: Array[Vector2i] = []
-	if cell.x != waypoint.x:
-		directions.append(Vector2i(1 if waypoint.x > cell.x else -1, 0))
-	if cell.y != waypoint.y:
-		directions.append(Vector2i(0, 1 if waypoint.y > cell.y else -1))
-	if not directions.is_empty():
-		next_cell = cell + directions[game.rng.randi_range(0, directions.size() - 1)]
+	var route: Array[Vector2i] = game.find_anomaly_path(cell, waypoint)
+	if route.is_empty():
+		waypoint = target
+		route = game.find_anomaly_path(cell, target)
+	if not route.is_empty():
+		next_cell = route[0]
 		route_steps -= 1
 

@@ -169,6 +169,12 @@ mouse_filter = 2
 theme_override_font_sizes/font_size = 14
 text = "Next: 5s"
 
+[node name="Phase" type="Label" parent="Root/WaveStatus"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_font_sizes/font_size = 14
+text = "War: camps"
+
 [node name="ThreatHelp" type="VBoxContainer" parent="Root"]
 offset_left = 22.0
 offset_top = 500.0
@@ -181,13 +187,13 @@ theme_override_constants/separation = 6
 layout_mode = 2
 mouse_filter = 2
 theme_override_font_sizes/font_size = 14
-text = "BOTH ARMIES"
+text = "KEEP THEM SAFE"
 
 [node name="Description" type="Label" parent="Root/ThreatHelp"]
 layout_mode = 2
 mouse_filter = 2
 theme_override_font_sizes/font_size = 14
-text = "hunt peaceful\npeople."
+text = "Soldiers attack\non contact."
 
 [node name="Controls" type="VBoxContainer" parent="Root"]
 offset_left = 945.0
@@ -274,6 +280,15 @@ offset_bottom = 744.0
 mouse_filter = 2
 theme_override_font_sizes/font_size = 17
 text = "Protect the five peaceful people. Grow their living population to 10."
+
+[node name="Delivered" type="Label" parent="Root"]
+offset_left = 22.0
+offset_top = 572.0
+offset_right = 152.0
+offset_bottom = 593.0
+mouse_filter = 2
+theme_override_font_sizes/font_size = 13
+text = "Delivered: 0"
 
 [node name="GameOver" type="ColorRect" parent="Root"]
 visible = false

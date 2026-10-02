@@ -12,6 +12,7 @@ extends Node2D
 @export var effect_scene: PackedScene = preload("res://scenes/entities/ripple.tscn")
 
 @onready var board: ForestBoard = $Board
+@onready var village: PeaceVillage = $Board/Village
 @onready var waves: WaveSpawner = $Systems/Waves
 @onready var seed_spawner: Node = $Systems/SeedSpawner
 @onready var combat: Node = $Systems/Combat
@@ -19,10 +20,12 @@ extends Node2D
 
 var trees: Dictionary = {}
 var seeds: Dictionary = {}
+var seed_claims: Dictionary = {}
 var soldiers: Array[PeacePerson] = []
 var stock := 0
 var level := 1
 var converted := 0
+var delivered := 0
 var deaths := 0
 var spawned := 0
 var goal := 10
@@ -33,6 +36,7 @@ var message := ""
 var hover := Vector2i(-1, -1)
 var rng := RandomNumberGenerator.new()
 var anomaly_count := 0
+var battle_winner := -1
 
 func _ready() -> void:
 	rng.randomize()
@@ -80,10 +84,45 @@ func make_person(team: int, cell: Vector2i, peaceful := false, anomaly := false)
 	return person
 
 func spawn_cell(team: int) -> Vector2i:
+	var camp := get_camp(team)
+	if camp != null:
+		return board.cell_at(board.to_local(camp.get_node("SpawnPoint").global_position))
+	return Vector2i.ZERO
+
+func get_camp(team: int) -> ArmyCamp:
 	for camp in $Camps.get_children():
 		if camp is ArmyCamp and camp.team == team:
-			return board.cell_at(board.to_local(camp.get_node("SpawnPoint").global_position))
-	return Vector2i.ZERO
+			return camp
+	return null
+
+func hostile_destination(team: int) -> Vector2i:
+	return village.home_cell(board) if battle_winner == team else spawn_cell(1 - team)
+
+func attack_destination(person: PeacePerson) -> void:
+	if person.peaceful or person.dead or person.retreated:
+		return
+	if battle_winner == person.team:
+		if person.cell == village.home_cell(board):
+			village.take_damage(settings.building_attack_damage)
+	elif battle_winner == -1 and person.cell == spawn_cell(1 - person.team):
+		var camp := get_camp(1 - person.team)
+		if camp != null and camp.take_damage(settings.building_attack_damage):
+			declare_army_winner(person.team)
+
+func declare_army_winner(team: int) -> void:
+	if battle_winner != -1:
+		return
+	battle_winner = team
+	for person in soldiers:
+		if person.peaceful:
+			continue
+		if person.team != team:
+			person.retreated = true
+		else:
+			person.route_steps = 0
+			person.waypoint = village.home_cell(board)
+			person.attack_elapsed = 0.0
+	notify_player("%s army won the war! It is now marching on the village." % ("Blue" if team == 0 else "Red"))
 
 func is_matching_gate(cell: Vector2i, team: int) -> bool:
 	for gate in $Board/Gates.get_children():
@@ -92,7 +131,10 @@ func is_matching_gate(cell: Vector2i, team: int) -> bool:
 	return false
 
 func protected(cell: Vector2i) -> bool:
-	return cell == spawn_cell(0) or cell == spawn_cell(1) or is_matching_gate(cell, 0) or is_matching_gate(cell, 1)
+	return village.is_building_cell(cell, board) or cell == spawn_cell(0) or cell == spawn_cell(1) or is_gate_cell(cell)
+
+func is_gate_cell(cell: Vector2i) -> bool:
+	return is_matching_gate(cell, 0) or is_matching_gate(cell, 1)
 
 func peaceful_count() -> int:
 	var count := 0
@@ -119,9 +161,44 @@ func collect_at(local_position: Vector2) -> void:
 		var seed_node: PeaceSeed = seeds[cell]
 		if seed_node.position.distance_to(local_position) < seed_node.collect_radius:
 			emit_effect(seed_node.position, Color("ffd47b"))
-			seed_node.queue_free()
-			seeds.erase(cell)
+			take_seed(cell)
 			stock += 1
+
+## Picking up a seed removes it; only village delivery credits villager stock.
+func take_seed(cell: Vector2i) -> bool:
+	if not seeds.has(cell):
+		return false
+	seeds[cell].queue_free()
+	seeds.erase(cell)
+	seed_claims.erase(cell)
+	return true
+
+func release_seed_claim(person: PeacePerson) -> void:
+	if seed_claims.get(person.seed_target) == person:
+		seed_claims.erase(person.seed_target)
+	person.seed_target = Vector2i(-1, -1)
+
+func find_seed_path(person: PeacePerson) -> Array[Vector2i]:
+	var targets: Dictionary = {}
+	for cell in seeds:
+		if not village.within_forage_area(cell, board):
+			continue
+		var claimant = seed_claims.get(cell)
+		if is_instance_valid(claimant) and not claimant.dead and claimant != person:
+			continue
+		targets[cell] = true
+	var path := GridPathfinding.find_path(board, person.cell, targets, trees)
+	if not path.is_empty():
+		seed_claims[path.back()] = person
+	return path
+
+func deliver_seeds(person: PeacePerson) -> void:
+	if not person.peaceful or person.dead or person.cell != village.home_cell(board) or person.carried_seeds <= 0:
+		return
+	stock += person.carried_seeds
+	delivered += person.carried_seeds
+	person.carried_seeds = 0
+	emit_effect(village.position, Color("ffd47b"))
 
 func plant(cell: Vector2i) -> bool:
 	if lost or not board.inside(cell) or protected(cell) or trees.has(cell):
@@ -135,8 +212,7 @@ func plant(cell: Vector2i) -> bool:
 			return false
 	stock -= settings.tree_cost
 	if seeds.has(cell):
-		seeds[cell].queue_free()
-		seeds.erase(cell)
+		take_seed(cell)
 	var tree := tree_scene.instantiate() as PeaceTree
 	tree.cell = cell
 	tree.position = board.point(cell)
@@ -163,12 +239,13 @@ func emit_effect(local_position: Vector2, color: Color) -> void:
 func find_path(from: Vector2i, target: Vector2i, ignore_trees := false) -> Array[Vector2i]:
 	return GridPathfinding.find_path(board, from, {target: true}, trees, ignore_trees)
 
-func find_hunt_path(from: Vector2i) -> Array[Vector2i]:
-	var targets: Dictionary = {}
-	for person in soldiers:
-		if person.peaceful and not person.dead:
-			targets[person.cell] = true
-	return GridPathfinding.find_path(board, from, targets, trees)
+func find_anomaly_path(from: Vector2i, target: Vector2i) -> Array[Vector2i]:
+	var gates: Dictionary = {}
+	for gate in $Board/Gates.get_children():
+		if gate is PeaceGate:
+			gates[board.cell_at(gate.position)] = true
+	# Gates are obstacles for anomalies; trees are deliberately omitted.
+	return GridPathfinding.find_path(board, from, {target: true}, gates)
 
 func spawn_pair() -> void:
 	# If this pair contains an anomaly, choose its team alternately.
@@ -179,6 +256,8 @@ func spawn_pair() -> void:
 	var preferred_team := 1 if anomaly_count % 2 == 0 else 0
 	if (first_is_anomaly and preferred_team == 1) or (not first_is_anomaly and second_is_anomaly and preferred_team == 0):
 		teams = [1, 0]
+	if battle_winner != -1:
+		teams = [battle_winner]
 	for team in teams:
 		spawned += 1
 		var anomaly := spawned % frequency == 0
@@ -189,6 +268,7 @@ func spawn_pair() -> void:
 
 func record_death(person: PeacePerson) -> void:
 	deaths += 1
+	release_seed_claim(person)
 	emit_effect(person.position, Color("f3a99a"))
 
 func spawn_seed() -> void:
@@ -227,10 +307,10 @@ func advance(delta: float) -> void:
 		person.step(delta, self)
 	combat.resolve(self)
 	var living := peaceful_count()
-	if living == 0:
+	if living == 0 or village.health <= 0:
 		lost = true
 		running = false
-		notify_player("No peaceful people survived. Restart to try again.")
+		notify_player("The village was destroyed. Restart to try again." if village.health <= 0 else "No peaceful people survived. Restart to try again.")
 	elif living >= goal:
 		level += 1
 		goal = settings.first_goal + (level - 1) * settings.goal_increment
