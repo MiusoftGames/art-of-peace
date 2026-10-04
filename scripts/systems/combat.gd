@@ -11,6 +11,10 @@ func resolve(game: Node) -> void:
 			if b.dead or b.retreated or (a.peaceful and b.peaceful) or (not a.peaceful and not b.peaceful and a.team == b.team):
 				continue
 			if a.position.distance_to(b.position) < game.settings.contact_distance:
+				if not a.peaceful:
+					a.show_attack(game, b.position - a.position)
+				if not b.peaceful:
+					b.show_attack(game, a.position - b.position)
 				if not b.peaceful:
 					a.dead = true
 				if not a.peaceful:

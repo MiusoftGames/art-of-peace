@@ -2,7 +2,7 @@
 
 [ext_resource type="Script" path="res://scripts/world/board.gd" id="1"]
 [ext_resource type="Resource" path="res://resources/default_settings.tres" id="2"]
-[ext_resource type="Texture2D" path="res://assets/sprites/placement.png" id="3"]
+[ext_resource type="Texture2D" path="res://assets/sprites/placement.svg" id="3"]
 
 [node name="Forest" type="Node2D"]
 script = ExtResource("1")
@@ -13,7 +13,7 @@ z_index = -1
 offset_right = 760.0
 offset_bottom = 600.0
 mouse_filter = 2
-color = Color(0.027451, 0.619608, 0.580392, 1)
+color = Color(0.64, 0.79, 0.55, 1)
 
 [node name="Gates" type="Node2D" parent="."]
 

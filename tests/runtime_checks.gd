@@ -10,6 +10,7 @@ func run(parent: Node) -> Dictionary:
 	template = load("res://main.tscn")
 	results.clear()
 	check_initial_state()
+	check_match_presentation()
 	check_resources_and_layout()
 	check_seed_and_trees()
 	check_waves()
@@ -35,12 +36,49 @@ func fresh_game() -> Node:
 	game.set_process_unhandled_input(false)
 	return game
 
+func check_match_presentation() -> void:
+	var game := fresh_game()
+	var panel: Control = game.hud.get_node("Root/StartPanel")
+	var seed_count: int = game.seeds.size()
+	var instructions: Label = game.hud.get_node("Root/StartPanel/Card/Instructions")
+	var start_button: Button = game.hud.get_node("Root/StartPanel/Card/StartButton")
+	results["start instructions stay above the button"] = instructions.position.y + instructions.get_minimum_size().y < start_button.position.y
+	game._process(30.0)
+	results["start panel freezes the initial match"] = panel.visible and not game.started and not game.running and game.spawned == 0 and game.seeds.size() == seed_count
+	game.hud.get_node("Root/StartPanel/Card/StartButton").pressed.emit()
+	results["center start button begins match"] = game.started and game.running and not panel.visible
+	game.toggle_march()
+	results["pause does not reopen start panel"] = not game.running and not panel.visible
+	var person: PeacePerson = game.make_person(0, game.board.cell_at(game.get_node("Board/Gates/BlueGate").position))
+	person.step(0.0, game)
+	results["conversion switches matching vector character art"] = person.peaceful and person.get_node("Sprite2D").texture.resource_path.ends_with("person_peaceful.svg") and person.get_node("Sprite2D").visible
+	person.next_cell = person.cell + Vector2i.RIGHT
+	person.step(0.05, game)
+	results["walking adds a small rotation"] = absf(person.get_node("Sprite2D").rotation) > 0.0
+	var attacker: PeacePerson = game.make_person(0, game.spawn_cell(1))
+	attacker.step(1.0, game)
+	var sword_visible := false
+	for effect in game.get_node("Board/Effects").get_children():
+		if effect.get_script().resource_path.ends_with("sword_swing.gd"):
+			sword_visible = effect.sword.texture.resource_path.ends_with("sword.svg")
+	results["camp attacks show a sword independent of soldier lifetime"] = attacker.dead and sword_visible
+	results["board is enlarged and essential UI fits above it"] = is_equal_approx(game.board.scale.x, 1.1) and game.hud.get_node("Root/TopBar").size.y == 48.0
+	game.sound.toggle()
+	results["sound toggle mutes all voices"] = game.sound.muted
+	for voice in game.sound.voices:
+		results["sound toggle mutes all voices"] = results["sound toggle mutes all voices"] and not voice.playing
+	game.free()
+	game = fresh_game()
+	results["mute preference survives restart"] = game.sound.muted
+	game.sound.toggle()
+	game.free()
+
 func check_initial_state() -> void:
 	var game := fresh_game()
 	results["three initial peaceful people"] = game.peaceful_count() == 3 and game.soldiers.size() == 3
 	results["empty forest and paused start"] = game.trees.is_empty() and not game.running and game.goal == 5
 	results["authored seeds and spawn markers"] = game.seeds.size() == 8 and game.spawn_cell(0) == Vector2i(0, 7) and game.spawn_cell(1) == Vector2i(18, 7)
-	results["PNG sprites"] = game.soldiers[0].get_node("Sprite2D").texture.resource_path.ends_with(".png")
+	results["matching vector sprites"] = game.soldiers[0].get_node("Sprite2D").texture.resource_path.ends_with(".svg")
 	game.free()
 
 func check_resources_and_layout() -> void:

@@ -11,11 +11,11 @@ var defeated := false
 	set(value):
 		team = value
 		refresh_sprite()
-@export var blue_texture: Texture2D = preload("res://assets/sprites/camp_blue.png"):
+@export var blue_texture: Texture2D = preload("res://assets/sprites/camp_blue.svg"):
 	set(value):
 		blue_texture = value
 		refresh_sprite()
-@export var red_texture: Texture2D = preload("res://assets/sprites/camp_red.png"):
+@export var red_texture: Texture2D = preload("res://assets/sprites/camp_red.svg"):
 	set(value):
 		red_texture = value
 		refresh_sprite()

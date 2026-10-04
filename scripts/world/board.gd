@@ -15,7 +15,7 @@ extends Node2D
 	set(value):
 		show_grid = value
 		queue_redraw()
-@export var grid_color := Color(1, 1, 1, 0.035)
+@export var grid_color := Color(1, 1, 1, 0.08)
 
 func _ready() -> void:
 	refresh_layout()

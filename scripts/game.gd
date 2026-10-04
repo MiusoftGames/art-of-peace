@@ -17,6 +17,8 @@ extends Node2D
 @onready var seed_spawner: Node = $Systems/SeedSpawner
 @onready var combat: Node = $Systems/Combat
 @onready var hud = $HUD
+var sound: Node
+var started := false
 
 var trees: Dictionary = {}
 var seeds: Dictionary = {}
@@ -44,6 +46,8 @@ var anomaly_remaining := 1
 var previous_layout: Array[Vector2i] = []
 
 func _ready() -> void:
+	sound = preload("res://scripts/systems/sound.gd").new()
+	add_child(sound)
 	rng.randomize()
 	board.settings = settings
 	stock = settings.starting_seeds
@@ -59,6 +63,8 @@ func _ready() -> void:
 	hud.restart_pressed.connect(reset_game)
 	hud.next_level_pressed.connect(next_level)
 	hud.speed_pressed.connect(cycle_speed)
+	hud.sound_pressed.connect(func() -> void: sound.toggle())
+	fit_playfield()
 	# Objects placed in main.tscn are the actual initial game state.
 	for person in $Board/People.get_children():
 		if person is PeacePerson:
@@ -73,6 +79,24 @@ func _ready() -> void:
 			seeds[seed_node.cell] = seed_node
 	notify_player("Rescue %d people: guide soldiers through their gate and into the village before a camp falls." % goal)
 	hud.update_status(self)
+
+func fit_playfield() -> void:
+	# Preserve all authored grid entries while growing the board into the old side UI.
+	var entries: Dictionary = {}
+	for camp in $Camps.get_children():
+		entries[camp] = camp_cell(camp)
+	board.position = Vector2(122, 64)
+	board.scale = Vector2.ONE * 1.1
+	board.show_grid = true
+	for camp in entries:
+		camp.scale = Vector2.ONE * 1.1
+		camp.position = Vector2(60 if camp.team == 0 else 1020, board.to_global(board.point(entries[camp])).y)
+		camp.get_node("SpawnPoint").position = camp.to_local(board.to_global(board.point(entries[camp])))
+		camp.get_node("Sprite2D").scale = Vector2.ONE * 0.8
+		camp.get_node("NameLabel").hide()
+		camp.get_node("Description").hide()
+		camp.get_node("HealthBar").scale = Vector2.ONE * 0.75
+	village.get_node("NameLabel").hide()
 
 func reset_game() -> void:
 	call_deferred("load_round", level)
@@ -95,6 +119,8 @@ func record_arrival(person: PeacePerson) -> void:
 	if person.peaceful and not person.dead and not person.reached_village:
 		person.reached_village = true
 		rescued = mini(goal, rescued + 1)
+		sound.play("peace")
+		emit_effect(village.position, Color("aaffab"))
 
 func finish_round(success: bool, reason := "") -> void:
 	if won or lost:
@@ -103,6 +129,7 @@ func finish_round(success: bool, reason := "") -> void:
 	lost = not success
 	running = false
 	failure_reason = reason
+	sound.play("win" if success else "lose")
 	notify_player("Peace restored! %d people reached the village." % rescued if won else reason)
 
 func register_person(person: PeacePerson) -> void:
@@ -200,6 +227,7 @@ func notify_player(text: String) -> void:
 	message = text
 
 func cycle_speed() -> void:
+	sound.play("click")
 	speed = 2.0 if speed == 1.0 else (4.0 if speed == 2.0 else 1.0)
 	hud.update_status(self)
 
@@ -209,8 +237,10 @@ func toggle_march() -> void:
 	elif lost:
 		reset_game()
 	else:
+		started = true
+		sound.play("click")
 		running = not running
-		notify_player("The armies are marching. Protect peaceful people." if running else "Paused. You can still collect seeds and plant trees.")
+		notify_player("Guide each army through its color gate." if running else "Paused. You can still collect seeds and plant trees.")
 	hud.update_status(self)
 
 func collect_at(local_position: Vector2) -> void:
@@ -222,6 +252,7 @@ func collect_at(local_position: Vector2) -> void:
 			emit_effect(seed_node.position, Color("ffd47b"))
 			take_seed(cell)
 			stock += 1
+			sound.play("collect")
 
 ## Picking up a seed removes it; only village delivery credits villager stock.
 func take_seed(cell: Vector2i) -> bool:
@@ -254,6 +285,7 @@ func deliver_seeds(person: PeacePerson) -> void:
 		return
 	stock += person.carried_seeds
 	delivered += person.carried_seeds
+	sound.play("collect")
 	person.carried_seeds = 0
 	emit_effect(village.position, Color("ffd47b"))
 
@@ -275,6 +307,10 @@ func plant(cell: Vector2i) -> bool:
 	tree.position = board.point(cell)
 	$Board/Trees.add_child(tree)
 	trees[cell] = tree
+	sound.play("plant")
+	tree.scale = Vector2.ONE * 0.3
+	var pop := create_tween()
+	pop.tween_property(tree, "scale", Vector2.ONE, 0.2).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	return true
 
 func destroy_tree(cell: Vector2i) -> bool:
@@ -282,6 +318,8 @@ func destroy_tree(cell: Vector2i) -> bool:
 		return false
 	trees[cell].queue_free()
 	trees.erase(cell)
+	sound.play("chop")
+	emit_effect(board.point(cell), Color("8de77a"))
 	return true
 
 func remove_tree(cell: Vector2i) -> bool:
@@ -295,6 +333,13 @@ func emit_effect(local_position: Vector2, color: Color) -> void:
 
 func find_path(from: Vector2i, target: Vector2i, ignore_trees := false) -> Array[Vector2i]:
 	return GridPathfinding.find_path(board, from, {target: true}, trees, ignore_trees)
+
+func emit_sword(local_position: Vector2, toward: Vector2) -> void:
+	var swing := preload("res://scripts/entities/sword_swing.gd").new()
+	swing.position = local_position
+	swing.direction = toward.normalized() if toward.length_squared() > 0.0 else Vector2.RIGHT
+	$Board/Effects.add_child(swing)
+	sound.play("sword")
 
 func find_anomaly_path(from: Vector2i, target: Vector2i) -> Array[Vector2i]:
 	var gates: Dictionary = {}
@@ -343,6 +388,8 @@ func spawn_seed() -> void:
 			return
 
 func _unhandled_input(event: InputEvent) -> void:
+	if not started and not event is InputEventKey:
+		return
 	if event is InputEventMouseMotion:
 		var local_position := board.to_local(event.position)
 		hover = board.cell_at(local_position)
@@ -376,9 +423,9 @@ func advance(delta: float) -> void:
 		finish_round(true)
 
 func _process(delta: float) -> void:
-	if not lost and not won:
+	if started and not lost and not won:
 		seed_spawner.advance(delta, self)
 	if running:
 		advance(delta * speed)
-	board.show_preview(hover, not protected(hover) and not trees.has(hover) and stock >= settings.tree_cost, not lost and not won)
+	board.show_preview(hover, not protected(hover) and not trees.has(hover) and stock >= settings.tree_cost, started and not lost and not won)
 	hud.update_status(self)

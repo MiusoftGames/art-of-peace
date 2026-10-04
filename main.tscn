@@ -6,7 +6,7 @@
 [ext_resource type="PackedScene" path="res://scenes/entities/peace_gate.tscn" id="5"]
 [ext_resource type="PackedScene" path="res://scenes/entities/peaceful_person.tscn" id="6"]
 [ext_resource type="PackedScene" path="res://scenes/entities/seed.tscn" id="7"]
-[ext_resource type="Texture2D" uid="uid://djr5w6o21a8r8" path="res://assets/sprites/camp_red.png" id="7_efxa6"]
+[ext_resource type="Texture2D" uid="uid://chfgj1iy1mr7g" path="res://assets/sprites/camp_red.svg" id="7_efxa6"]
 [ext_resource type="PackedScene" path="res://scenes/ui/hud.tscn" id="8"]
 [ext_resource type="PackedScene" path="res://scenes/systems/waves.tscn" id="9"]
 [ext_resource type="Script" uid="uid://fe1c0ucs17f4" path="res://scripts/systems/seed_spawner.gd" id="10"]
@@ -21,7 +21,7 @@ z_index = -2
 offset_right = 1080.0
 offset_bottom = 760.0
 mouse_filter = 2
-color = Color(0.929412, 0.764706, 0.611765, 1)
+color = Color(0.91, 0.91, 0.8, 1)
 
 [node name="Board" parent="." unique_id=1952531580 instance=ExtResource("3")]
 position = Vector2(160, 100)

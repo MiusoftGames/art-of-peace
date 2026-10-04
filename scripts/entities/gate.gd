@@ -6,11 +6,11 @@ extends Node2D
 	set(value):
 		team = value
 		refresh_sprite()
-@export var blue_texture: Texture2D = preload("res://assets/sprites/gate_blue.png"):
+@export var blue_texture: Texture2D = preload("res://assets/sprites/gate_blue.svg"):
 	set(value):
 		blue_texture = value
 		refresh_sprite()
-@export var red_texture: Texture2D = preload("res://assets/sprites/gate_red.png"):
+@export var red_texture: Texture2D = preload("res://assets/sprites/gate_red.svg"):
 	set(value):
 		red_texture = value
 		refresh_sprite()

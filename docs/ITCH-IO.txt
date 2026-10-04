@@ -1,0 +1,36 @@
+TITLE
+Art of Peace
+
+TAGLINE
+Plant trees. Guide them home.
+
+DESCRIPTION
+A tiny strategy game about keeping the peace. Collect seeds, plant trees, and guide rival armies through their color gates to bring people safely home.
+
+CONTROLS
+Hover: collect seeds. Left-click: plant. Right-click: remove.
+Space: pause. F: speed. R: restart.
+Desktop browser; mouse and keyboard.
+
+CREDITS
+Made with Godot. Sound effects by Kenney (CC0). AI-generated cover artwork.
+
+PAGE SETTINGS
+Kind: HTML. Genre: Strategy. Suggested price: Free / donations.
+Tags: strategy, puzzle, minimalist, 2d, singleplayer, godot.
+Upload art-of-peace-web.zip and check "This file will be played in the browser".
+Embed: 1080 x 760. Enable fullscreen and click to launch.
+Mobile friendly: off. SharedArrayBuffer support: off (single-thread build).
+Cover: cover.png. Screenshots: screenshot-gameplay.png, screenshot-characters.png.
+Keep the page as Draft for an itch.io preview test, then set Public when ready.
+
+IMPORTANT
+Upload the inner art-of-peace-web.zip, not the entire itch-upload-kit.zip.
+
+REFERENCES
+https://itch.io/docs/creators/html5
+https://itch.io/docs/creators/getting-started
+
+VERIFIED
+Godot 4.6 release web export. Browser start, spawning, planting and pause tested.
+145 gameplay checks passed. The itch.io-hosted preview still needs your final check.

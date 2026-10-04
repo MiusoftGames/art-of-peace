@@ -17,15 +17,15 @@ extends Node2D
 		refresh_sprite()
 @export_range(0.1, 3.0, 0.1) var speed_multiplier := 1.0
 @export_group("Images")
-@export var blue_texture: Texture2D = preload("res://assets/sprites/person_blue.png"):
+@export var blue_texture: Texture2D = preload("res://assets/sprites/person_blue.svg"):
 	set(value):
 		blue_texture = value
 		refresh_sprite()
-@export var red_texture: Texture2D = preload("res://assets/sprites/person_red.png"):
+@export var red_texture: Texture2D = preload("res://assets/sprites/person_red.svg"):
 	set(value):
 		red_texture = value
 		refresh_sprite()
-@export var peaceful_texture: Texture2D = preload("res://assets/sprites/person_peaceful.png"):
+@export var peaceful_texture: Texture2D = preload("res://assets/sprites/person_peaceful.svg"):
 	set(value):
 		peaceful_texture = value
 		refresh_sprite()
@@ -48,6 +48,26 @@ var carried_seeds := 0:
 		if carried_sprite != null:
 			carried_sprite.visible = carried_seeds > 0
 
+var walk_phase := 0.0
+var swing_remaining := 0.0
+
+func animate_walk(delta: float, walking: bool) -> void:
+	var sprite := get_node_or_null("Sprite2D") as Sprite2D
+	if sprite == null:
+		return
+	if walking:
+		walk_phase += delta * 12.0
+		sprite.rotation = sin(walk_phase) * 0.13
+		sprite.position.y = -absf(sin(walk_phase)) * 1.8
+	else:
+		sprite.rotation = lerpf(sprite.rotation, 0.0, minf(delta * 15.0, 1.0))
+		sprite.position.y = lerpf(sprite.position.y, 0.0, minf(delta * 15.0, 1.0))
+
+func show_attack(game: Node, toward: Vector2) -> void:
+	if swing_remaining <= 0.0:
+		game.emit_sword(position, toward)
+		swing_remaining = 0.55
+
 func _ready() -> void:
 	refresh_sprite()
 
@@ -55,6 +75,8 @@ func refresh_sprite() -> void:
 	var sprite := get_node_or_null("Sprite2D") as Sprite2D
 	if sprite != null:
 		sprite.texture = peaceful_texture if peaceful else (blue_texture if team == 0 else red_texture)
+		if sprite.texture != null:
+			sprite.scale = Vector2.ONE * 32.0 / sprite.texture.get_height()
 	var marker := get_node_or_null("AnomalyMarker") as Sprite2D
 	if marker != null:
 		marker.visible = anomaly and not peaceful
@@ -66,6 +88,8 @@ func step(delta: float, game: Node) -> void:
 	if dead or retreated:
 		return
 	var destination: Vector2 = game.board.point(next_cell)
+	swing_remaining = maxf(0.0, swing_remaining - delta)
+	animate_walk(delta, position.distance_to(destination) > 0.1)
 	if position.distance_to(destination) > 0.1:
 		var movement_speed: float = (game.settings.movement_speed + (game.level - 1) * game.settings.speed_gain_per_level) * speed_multiplier
 		position = position.move_toward(destination, movement_speed * delta)
@@ -77,12 +101,14 @@ func step(delta: float, game: Node) -> void:
 	if not peaceful and game.is_matching_gate(cell, team):
 		peaceful = true
 		game.converted += 1
+		game.sound.play("peace")
 		game.emit_effect(position, Color.WHITE)
 	if peaceful:
 		visit_village(delta, game)
 		return
 	var target: Vector2i = game.hostile_destination(team, cell)
 	if cell == target:
+		show_attack(game, Vector2.RIGHT if team == 0 else Vector2.LEFT)
 		attack_elapsed += delta
 		var interval: float = maxf(0.1, game.settings.building_attack_interval)
 		while attack_elapsed >= interval:
@@ -104,6 +130,7 @@ func step(delta: float, game: Node) -> void:
 		var blocked_path: Array[Vector2i] = game.find_path(cell, target, true)
 		if not blocked_path.is_empty():
 			if game.trees.has(blocked_path[0]):
+				show_attack(game, game.board.point(blocked_path[0]) - position)
 				cut_elapsed += delta
 				game.trees[blocked_path[0]].cut_progress = cut_elapsed / game.settings.tree_cut_seconds
 				if cut_elapsed >= game.settings.tree_cut_seconds:
@@ -187,4 +214,3 @@ func move_anomaly(target: Vector2i, game: Node) -> void:
 	if not route.is_empty():
 		next_cell = route[0]
 		route_steps -= 1
-

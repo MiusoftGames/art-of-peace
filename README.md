@@ -2,7 +2,7 @@
 
 Open `project.godot` in Godot 4.6 and press **F5**.
 
-- Start paused with an empty forest and **three peaceful people in the middle**.
+- Click the centered **Start match** button to begin. The opening panel explains the goal and controls; the match stays frozen until you start.
 - Hover over golden seeds to collect; left-click empty tiles to plant trees for one seed. Right-click removes a tree without refunding seeds.
 - **Space** starts/pauses, **R** restarts, and **F** or the speed button cycles Normal (1x), Fast (2x), and Ultra (4x). You can collect and reshape the forest while paused.
 - **Rescue 5 people to the village before either camp falls.** Arrivals count once, including the three starting peaceful people. Conversion alone does not count; later deaths do not subtract completed rescues.
@@ -19,9 +19,13 @@ Open `project.godot` in Godot 4.6 and press **F5**.
 - Peaceful villagers collect reachable seeds anywhere on the map, carry one seed at a time, and return to the village. Your stock increases **on delivery**, not pickup. A killed carrier loses the undelivered seed. You can still collect seeds yourself by hovering.
 - From level 5, occasional randomly spaced soldiers are **anomalies**. Orange rings and markers identify them. Their random detours lead toward the opposing camp. They ignore trees and destroy them on contact, but route around **both peace gates**. If forced onto a matching gate tile, the gate still converts them.
 
-The game now uses separate editable Godot scenes, scripts, and transparent PNG placeholder sprites. The existing Godot MCP addon is preserved.
+The board is 21% larger on screen, with a single 48-pixel HUD and a small controls hint. Characters use clean vector artwork with outlines matching the props, and the board has a faint white grid. Trees, seeds, gates, camps, and village use matching flat-color SVGs with bold outlines. Walking sways gently, planted trees pop in, and attacks show a small sword swing. Kenney effects cover collection, planting, chopping, sword attacks, conversion, and round results; **Sound on/off** retains your choice across rounds. Licenses are in `assets/audio/`.
 
-## Editing
+## itch.io Web release
+
+Export with `godot --headless --path . --export-release Web release/web/index.html`, then run `python tools/package_itch.py` after preparing the cover and screenshots in `release/itch-kit/`. Upload the inner `art-of-peace-web.zip` as a browser-playable HTML game. Page copy and settings are in `docs/ITCH-IO.txt`. The complete kit is `release/itch-upload-kit.zip`.
+
+## Editing the game
 
 Read [the editor guide](docs/EDITOR_GUIDE.md) for the scene tree, artwork replacement steps, Inspector settings, and code responsibilities.
 
@@ -30,6 +34,6 @@ Read [the editor guide](docs/EDITOR_GUIDE.md) for the scene tree, artwork replac
 - **Objects:** open the separate scenes in `scenes/entities/`. Blue/red soldiers, peaceful people, and anomalies are inherited variants of `person.tscn`.
 - **Village:** move `Board/Village` in the main scene. Its Inspector exposes wander and forage radii; its separate `village.tscn` scene uses replaceable PNG art.
 - **Camp health:** select their scene roots and edit Max Health. Attack interval and damage are in the shared settings resource under Camp Attacks.
-- **Sprites:** replace the PNG images in `assets/sprites/`, or assign new textures in the entity scenes. Matching SVGs are the original shape sources.
+- **Sprites:** characters and props use matching editable SVGs in `assets/sprites/`. Character textures are assigned in `scripts/entities/person.gd`. `python tools/polish_assets.py` rebuilds the sprites and minimal HUD scene.
 - **UI:** edit `scenes/ui/hud.tscn` and `resources/ui_theme.tres`.
 - **Checks:** open `tests/run_checks.tscn` and press **F6**. The regression suite checks the real scenes and gameplay rules; **F5** runs the game again.
